@@ -1,0 +1,36 @@
+services:
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: uml_postgres
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+
+    ports:
+      - "${DB_PORT}:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: educare_pgadmin
+
+    restart: always
+
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+
+    ports:
+      - "${PGADMIN_PORT}:80"
+
+    depends_on:
+      - postgres-db
+
+volumes:
+  postgres_data:
