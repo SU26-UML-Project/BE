@@ -18,7 +18,7 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4
-    container_name: educare_pgadmin
+    container_name: uml_pgadmin
 
     restart: always
 
