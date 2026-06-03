@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 import java.util.Date;
 
 @Entity
-@Table(name = "InvalidatedToken")
+@Table(name = "invalidated_token")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

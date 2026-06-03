@@ -20,13 +20,13 @@ public class Role {
     @Id
     @GeneratedValue
     @UuidGenerator
-    @Column(name = "RoleID")
+    @Column(name = "role_id")
     UUID roleID;
 
-    @Column(name = "RoleName", nullable = false, unique = true)
+    @Column(name = "role_name", nullable = false, unique = true)
     String roleName;
 
-    @Column(name = "Description", length = 1000)
+    @Column(name = "description", length = 1000)
     String description;
 
     @OneToMany(mappedBy = "role", cascade = CascadeType.ALL, orphanRemoval = true)

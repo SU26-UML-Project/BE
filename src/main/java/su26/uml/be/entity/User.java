@@ -21,48 +21,48 @@ public class User {
     @Id
     @GeneratedValue
     @UuidGenerator
-    @Column(name = "UserID", updatable = false, nullable = false)
-    private UUID userID;
+    @Column(name = "user_id", updatable = false, nullable = false)
+    UUID userID;
 
-    @Column(name = "UserName", nullable = false, unique = true)
+    @Column(name = "user_name", nullable = false, unique = true)
     String username;
 
-    @Column(name = "Password", nullable = false)
+    @Column(name = "password", nullable = false)
     String password;
 
-    @Column(name = "FullName", nullable = false, length = 100)
+    @Column(name = "full_name", nullable = false, length = 100)
     String fullName;
 
-    @Column(name = "Email", nullable = false, unique = true)
+    @Column(name = "email", nullable = false, unique = true)
     String email;
 
-    @Column(name = "Phone", nullable = false)
+    @Column(name = "phone", nullable = false)
     String phone;
 
     @ManyToOne
-    @JoinColumn(name = "RoleID", nullable = false)
+    @JoinColumn(name = "role_id", nullable = false)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     Role role;
 
-    @Column(name = "Status", nullable = false)
+    @Column(name = "status", nullable = false)
     String status;
 
-    @Column(name = "AvatarUrl", length = 500)
+    @Column(name = "avatar_url", length = 500)
     String avatarUrl;
 
-    @Column(name = "LastActiveAt")
+    @Column(name = "last_active_at")
     LocalDateTime lastActiveAt;
 
-    @Column(name = "LastPasswordChangeAt")
+    @Column(name = "last_password_change_at")
     LocalDateTime lastPasswordChangeAt;
 
     @CreationTimestamp
-    @Column(name = "CreatedAt", updatable = false)
+    @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(name = "UpdatedAt")
+    @Column(name = "updated_at")
     LocalDateTime updatedAt;
 
 //    // ── NEW: AWS Cognito user identifier ─────────────────────────────────────
@@ -72,6 +72,6 @@ public class User {
 //    //
 //    // DDL note: hibernate.ddl-auto=update will ADD this column automatically on
 //    // the next application start — no manual migration required.
-//    @Column(name = "CognitoSub", unique = true)
+//    @Column(name = "cognito_sub", unique = true)
 //    String cognitoSub;
 }
