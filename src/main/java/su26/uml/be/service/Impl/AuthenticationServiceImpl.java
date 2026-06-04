@@ -120,7 +120,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         var token = generateToken(user);
 
-
         return AuthenticationResponse.builder()
                 .token(token)
                 .authenticated(true)

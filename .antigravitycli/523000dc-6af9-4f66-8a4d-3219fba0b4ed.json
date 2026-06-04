@@ -1,1 +1,14 @@
-C:/Users/Admin/.gemini/config/projects/523000dc-6af9-4f66-8a4d-3219fba0b4ed.json
+{
+  "id": "523000dc-6af9-4f66-8a4d-3219fba0b4ed",
+  "name": "D:\\SU26\\UML_Project\\BE",
+  "projectResources": {
+    "resources": [
+      {
+        "gitFolder": {
+          "folderUri": "file://D:/SU26/UML_Project/BE",
+          "allowWrite": true
+        }
+      }
+    ]
+  }
+}
