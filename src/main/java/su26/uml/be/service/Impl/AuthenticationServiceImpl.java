@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import su26.uml.be.dto.request.IntrospectRequest;
 import su26.uml.be.dto.request.LoginRequest;
 import su26.uml.be.dto.request.LogoutRequest;
+import su26.uml.be.dto.request.RefreshTokenRequest;
 import su26.uml.be.dto.response.AuthenticationResponse;
 import su26.uml.be.dto.response.IntrospectResponse;
 import su26.uml.be.entity.InvalidatedToken;
@@ -29,7 +30,6 @@ import su26.uml.be.service.AuthenticationService;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.UUID;
 
@@ -45,6 +45,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @NonFinal
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
+
+    @NonFinal
+    @Value("${jwt.accessTokenExpiration:3600}")
+    protected long ACCESS_TOKEN_EXPIRATION;
+
+    @NonFinal
+    @Value("${jwt.refreshTokenExpiration:604800}")
+    protected long REFRESH_TOKEN_EXPIRATION;
 
     @Override
     public IntrospectResponse introspect(IntrospectRequest request) {
@@ -82,12 +90,42 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         invalidatedTokenRepository.save(invalidatedToken);
     }
 
+    @Override
+    public AuthenticationResponse refreshToken(RefreshTokenRequest request) {
+        try {
+            var signedToken = verifyToken(request.getToken(), true);
+
+            var jit = signedToken.getJWTClaimsSet().getJWTID();
+            var expiryTime = signedToken.getJWTClaimsSet().getExpirationTime();
+
+            InvalidatedToken invalidatedToken = InvalidatedToken.builder()
+                    .iD(jit)
+                    .expiryTime(expiryTime)
+                    .build();
+            invalidatedTokenRepository.save(invalidatedToken);
+
+            var username = signedToken.getJWTClaimsSet().getSubject();
+            var user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+            var token = generateToken(user);
+            var refreshToken = generateRefreshToken(user);
+
+            return AuthenticationResponse.builder()
+                    .token(token)
+                    .refreshToken(refreshToken)
+                    .authenticated(true)
+                    .build();
+        } catch (JOSEException | ParseException e) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+    }
+
     private SignedJWT verifyToken(String token) throws JOSEException, ParseException {
         JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
         SignedJWT signedJWT = SignedJWT.parse(token);
 
         Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
-
         var verified = signedJWT.verify(verifier);
 
         if (!(verified && expiryTime.after(new Date()))) {
@@ -95,7 +133,35 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
 
         if (invalidatedTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID()))
-                throw new AppException(ErrorCode.UNAUTHENTICATED);
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+
+        String tokenType = signedJWT.getJWTClaimsSet().getStringClaim("tokenType");
+        if (!"ACCESS".equals(tokenType)) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        return signedJWT;
+    }
+
+    private SignedJWT verifyToken(String token, boolean isRefresh) throws JOSEException, ParseException {
+        JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
+        SignedJWT signedJWT = SignedJWT.parse(token);
+
+        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+        var verified = signedJWT.verify(verifier);
+
+        if (!(verified && expiryTime.after(new Date()))) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        if (invalidatedTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID()))
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+
+        String expectedType = isRefresh ? "REFRESH" : "ACCESS";
+        String tokenType = signedJWT.getJWTClaimsSet().getStringClaim("tokenType");
+        if (!expectedType.equals(tokenType)) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
 
         return signedJWT;
     }
@@ -119,9 +185,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         userRepository.save(user);
 
         var token = generateToken(user);
+        var refreshToken = generateRefreshToken(user);
 
         return AuthenticationResponse.builder()
                 .token(token)
+                .refreshToken(refreshToken)
                 .authenticated(true)
                 .build();
     }
@@ -135,14 +203,15 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     .issuer("DiaUML-Studio")
                     .issueTime(new Date())
                     .expirationTime(new Date(
-                            Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()
+                            Instant.now().plusSeconds(ACCESS_TOKEN_EXPIRATION).toEpochMilli()
                     ))
                     .claim("userID", user.getUserID())
                     .claim("fullName", user.getFullName())
                     .claim("email", user.getEmail())
                     .jwtID(UUID.randomUUID().toString())
                     .claim("scope", "ROLE_" + user.getRole().getRoleName())
-                    .claim("role", "ROLE_" +user.getRole().getRoleName())
+                    .claim("role", "ROLE_" + user.getRole().getRoleName())
+                    .claim("tokenType", "ACCESS")
                     .build();
 
             Payload payload = new Payload(jwtClaimsSet.toJSONObject());
@@ -156,4 +225,29 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
     }
 
+    private String generateRefreshToken(User user) {
+        try {
+            JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
+
+            JWTClaimsSet jwtClaimsSet = new JWTClaimsSet.Builder()
+                    .subject(user.getUsername())
+                    .issuer("DiaUML-Studio")
+                    .issueTime(new Date())
+                    .expirationTime(new Date(
+                            Instant.now().plusSeconds(REFRESH_TOKEN_EXPIRATION).toEpochMilli()
+                    ))
+                    .jwtID(UUID.randomUUID().toString())
+                    .claim("tokenType", "REFRESH")
+                    .build();
+
+            Payload payload = new Payload(jwtClaimsSet.toJSONObject());
+            JWSObject jwsObject = new JWSObject(header, payload);
+
+            jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
+            return jwsObject.serialize();
+        } catch (JOSEException e) {
+            log.error("Cannot create refresh token", e);
+            throw new RuntimeException(e);
+        }
+    }
 }

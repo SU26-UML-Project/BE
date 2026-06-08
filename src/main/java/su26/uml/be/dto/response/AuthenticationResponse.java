@@ -17,4 +17,6 @@ public class AuthenticationResponse {
 
     @Schema(description = "True when authentication succeeded.", example = "true")
     boolean authenticated;
+
+    String refreshToken;
 }

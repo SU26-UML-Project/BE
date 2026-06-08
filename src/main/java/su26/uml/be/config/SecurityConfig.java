@@ -24,6 +24,7 @@ public class SecurityConfig {
 
     private final String[] PUBLIC_ENDPOINTS = {
             "/auth/login",
+            "/auth/refresh",
             "/users/register",
             "/auth/introspect",
             "/auth/logout",
@@ -31,19 +32,12 @@ public class SecurityConfig {
             "/users/verify-otp",
             "/users/reset-password",
             "/actuator/health",
-            // Swagger / OpenAPI
-            "/api-docs",
-            "/api-docs.json",
-            "/api-docs.json.yaml",
-            "/api-docs.yaml",
-            "/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html",
-            "/v3/api-docs/**",
-    };
 
-//    @Value("${jwt.signerKey}")
-//    private String signerKey;
+            "/v3/api-docs/**",
+            "/v3/api-docs.yaml",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
+    };
 
     @Autowired
     private CustomJwtDecoder customJwtDecoder;

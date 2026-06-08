@@ -35,16 +35,16 @@ spring:
 
 jwt:
   signerKey: ${JWT_SIGNER_KEY}
+  accessTokenExpiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600}
+  refreshTokenExpiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800}
 
 springdoc:
   api-docs:
     enabled: true
-    # OpenAPI JSON spec served at /api-docs.json (full URL: <context-path>/api-docs.json)
-    path: /api-docs.json
+    path: /v3/api-docs # Đường dẫn trả về JSON spec gốc
   swagger-ui:
     enabled: true
-    # Swagger UI served at /api-docs (full URL: <context-path>/api-docs)
-    path: /api-docs
+    path: /swagger-ui.html # Đường dẫn truy cập giao diện UI trên trình duyệt
     operations-sorter: method
     tags-sorter: alpha
     display-request-duration: true

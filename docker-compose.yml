@@ -1,4 +1,17 @@
 services:
+  be-uml:
+    build: .
+    container_name: uml_be
+    restart: always
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres-db
+    ports:
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    depends_on:
+      - postgres-db
+
   postgres-db:
     image: postgres:15-alpine
     container_name: uml_postgres

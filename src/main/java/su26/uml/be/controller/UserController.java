@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import su26.uml.be.config.swagger.SwaggerExamples;
 import su26.uml.be.dto.request.UserRegisterRequest;
-import su26.uml.be.dto.response.ApiResponse;
 import su26.uml.be.dto.response.UserResponse;
 import su26.uml.be.service.UserService;
 
@@ -31,50 +31,17 @@ public class UserController {
     @PostMapping("/register")
     @Operation(
             summary = "Register a new user account",
-            description = "Creates a new user from the supplied details after validating uniqueness "
-                    + "(username, email) and the assigned role. Public endpoint — no Bearer token required."
+            description = "Creates a new user after validating field constraints, username/email uniqueness, " +
+                    "and the existence of the assigned role."
     )
     @SecurityRequirements({})
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = true,
             content = @Content(schema = @Schema(implementation = UserRegisterRequest.class),
-                    examples = @ExampleObject(value = """
-                            {
-                              "username": "johndoe",
-                              "password": "Passw0rd",
-                              "fullName": "John Doe",
-                              "email": "john.doe@gmail.com",
-                              "phone": "0901234567",
-                              "roleId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-                            }""")))
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "User registered successfully.",
-                    content = @Content(schema = @Schema(implementation = UserResponse.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "code": 200,
-                                      "message": "Đăng ký thành công",
-                                      "result": {
-                                        "userID": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-                                        "username": "johndoe",
-                                        "fullName": "John Doe",
-                                        "email": "john.doe@gmail.com",
-                                        "phone": "0901234567",
-                                        "status": "ACTIVE",
-                                        "role": {"roleID":"3fa85f64-5717-4562-b3fc-2c963f66afa6","roleName":"USER","description":"Standard application user"}
-                                      }
-                                    }"""))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
-                    description = "Validation failed or duplicate username/email (USER_EXISTED, EMAIL_EXISTED, "
-                            + "INVALID_PASSWORD, INVALID_EMAIL_FORMAT, INVALID_PHONE, ...).",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class),
-                            examples = @ExampleObject(value = "{\"code\":1002,\"message\":\"Username đã được sử dụng, hãy sử dụng username khác!\"}"))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Assigned role does not exist (ROLE_NOT_FOUND).",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Unexpected server error.",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class)))
-    })
-    public ApiResponse<UserResponse> register(@Valid @RequestBody UserRegisterRequest request) {
+                    examples = @ExampleObject(value = SwaggerExamples.REGISTER_REQUEST)))
+    @ApiResponse(responseCode = "200", description = "User registered successfully.",
+            content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
+                    examples = @ExampleObject(value = SwaggerExamples.REGISTER_RESPONSE)))
+    public su26.uml.be.dto.response.ApiResponse<UserResponse> register(@Valid @RequestBody UserRegisterRequest request) {
         return userService.registerUser(request);
     }
 }
