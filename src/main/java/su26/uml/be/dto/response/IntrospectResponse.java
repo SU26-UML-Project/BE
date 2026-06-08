@@ -1,5 +1,6 @@
 package su26.uml.be.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -8,6 +9,8 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@Schema(name = "IntrospectResponse", description = "Result of token introspection.")
 public class IntrospectResponse {
+    @Schema(description = "True when the supplied token is valid and not blacklisted.", example = "true")
     boolean valid;
 }
