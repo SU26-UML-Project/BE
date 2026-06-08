@@ -53,11 +53,11 @@ public class AuthenticationController {
                     content = @Content(schema = @Schema(implementation = AuthenticationResponse.class),
                             examples = @ExampleObject(value = "{\"code\":200,\"message\":null,\"result\":{\"token\":\"eyJhbGciOiJIUzUxMiJ9...\",\"authenticated\":true}}"))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Invalid credentials (USER_NOT_FOUND / INVALID_CREDENTIALS).",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))),
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Account is locked (USER_INACTIVE).",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))),
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Unexpected server error.",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse")))
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
     ApiResponse<AuthenticationResponse> login(@RequestBody LoginRequest request) {
         var result = authenticationService.authenticate(request);
@@ -91,9 +91,9 @@ public class AuthenticationController {
                     content = @Content(schema = @Schema(implementation = IntrospectResponse.class),
                             examples = @ExampleObject(value = "{\"code\":200,\"message\":null,\"result\":{\"valid\":true}}"))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Malformed token / unparseable request.",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))),
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Unexpected server error.",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse")))
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
     ApiResponse<IntrospectResponse> introspect(@RequestBody IntrospectRequest request)
             throws ParseException, JOSEException {
@@ -119,11 +119,11 @@ public class AuthenticationController {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class),
                             examples = @ExampleObject(value = "{\"code\":0,\"message\":null,\"result\":null}"))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Malformed / unparseable token.",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))),
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Token signature invalid or already expired (UNAUTHENTICATED).",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))),
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Unexpected server error.",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse")))
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
     ApiResponse<Void> logout(@RequestBody LogoutRequest request)
             throws ParseException, JOSEException {
@@ -145,7 +145,7 @@ public class AuthenticationController {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class),
                             examples = @ExampleObject(value = "{\"code\":0,\"message\":null,\"result\":{\"locked\":false}}"))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Unexpected server error.",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse")))
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
     ApiResponse<Map<String, Object>> accountStatus(
             @Parameter(description = "Username or email to look up.", required = true, example = "johndoe")

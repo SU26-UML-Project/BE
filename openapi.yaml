@@ -11,6 +11,8 @@ info:
     2. Click **Authorize** and paste the token to call protected endpoints.
 
     All responses are wrapped in a standard envelope: `{ code, message, result }`.
+    On errors, `result` is absent (omitted by `@JsonInclude(NON_NULL)`).
+    Error codes are defined in `ErrorCode` (e.g. 1006 = invalid credentials).
   contact:
     name: SU26 UML Project Team
     email: uml-admin@educare.com
@@ -78,23 +80,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
               example:
                 code: 1002
                 message: "Username đã được sử dụng, hãy sử dụng username khác!"
-                result: null
         "404":
           description: Assigned role does not exist (ROLE_NOT_FOUND).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
         "500":
           description: Unexpected server error.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
       security: []
   /auth/logout:
     post:
@@ -128,19 +129,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
         "401":
           description: Token signature invalid or already expired (UNAUTHENTICATED).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
         "500":
           description: Unexpected server error.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
       security: []
   /auth/login:
     post:
@@ -177,19 +178,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
         "403":
           description: Account is locked (USER_INACTIVE).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
         "500":
           description: Unexpected server error.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
       security: []
   /auth/introspect:
     post:
@@ -224,13 +225,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
         "500":
           description: Unexpected server error.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
       security: []
   /auth/account-status:
     get:
@@ -267,27 +268,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ApiResponse"
       security: []
 components:
   schemas:
-    ErrorResponse:
-      type: object
-      description: Standard error envelope returned for all non-2xx responses.
-      properties:
-        code:
-          type: integer
-          format: int32
-          description: Application-specific error code (see ErrorCode enum). Not the
-            HTTP status.
-          example: 1006
-        message:
-          type: string
-          description: Human-readable error message.
-          example: Tên đăng nhập hoặc mật khẩu không đúng
-        result:
-          type: object
-          description: Always null for error responses.
     UserRegisterRequest:
       type: object
       description: Payload for registering a new user account.
@@ -403,16 +387,6 @@ components:
         role:
           $ref: "#/components/schemas/RoleResponse"
           description: Role assigned to the user.
-    LogoutRequest:
-      type: object
-      description: Wraps the JWT to invalidate.
-      properties:
-        token:
-          type: string
-          description: The JWT to invalidate (blacklist until expiry).
-          example: eyJhbGciOiJIUzUxMiJ9...
-      required:
-      - token
     ApiResponse:
       type: object
       description: Standard response envelope wrapping every endpoint result.
@@ -429,6 +403,16 @@ components:
           example: Success
         result:
           description: Payload of the response; null when there is no body.
+    LogoutRequest:
+      type: object
+      description: Wraps the JWT to invalidate.
+      properties:
+        token:
+          type: string
+          description: The JWT to invalidate (blacklist until expiry).
+          example: eyJhbGciOiJIUzUxMiJ9...
+      required:
+      - token
     LoginRequest:
       type: object
       description: Credentials used to obtain a JWT.

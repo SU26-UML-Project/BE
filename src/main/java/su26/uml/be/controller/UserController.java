@@ -67,12 +67,12 @@ public class UserController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
                     description = "Validation failed or duplicate username/email (USER_EXISTED, EMAIL_EXISTED, "
                             + "INVALID_PASSWORD, INVALID_EMAIL_FORMAT, INVALID_PHONE, ...).",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"),
-                            examples = @ExampleObject(value = "{\"code\":1002,\"message\":\"Username đã được sử dụng, hãy sử dụng username khác!\",\"result\":null}"))),
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(value = "{\"code\":1002,\"message\":\"Username đã được sử dụng, hãy sử dụng username khác!\"}"))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Assigned role does not exist (ROLE_NOT_FOUND).",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse"))),
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Unexpected server error.",
-                    content = @Content(schema = @Schema(ref = "#/components/schemas/ErrorResponse")))
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
     public ApiResponse<UserResponse> register(@Valid @RequestBody UserRegisterRequest request) {
         return userService.registerUser(request);
