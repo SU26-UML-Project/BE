@@ -1,4 +1,4 @@
-package su26.uml.be.config;
+package su26.uml.be.config.security;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;

@@ -66,7 +66,11 @@ public enum ErrorCode {
 
     // NOTIFICATION & FEEDBACK ERRORS
     NOTIFICATION_NOT_FOUND(1600, "Không tìm thấy thông báo", HttpStatus.NOT_FOUND),
-    FEEDBACK_NOT_FOUND(1601, "Không tìm thấy nhận xét", HttpStatus.NOT_FOUND),;
+    FEEDBACK_NOT_FOUND(1601, "Không tìm thấy nhận xét", HttpStatus.NOT_FOUND),
+
+    // OAUTH2 ERRORS
+    OAUTH2_EMAIL_NOT_VERIFIED(2001, "Email Google chưa được xác thực. Vui lòng xác thực email trước khi đăng nhập.", HttpStatus.BAD_REQUEST),
+    OAUTH2_PROCESSING_ERROR(2002, "Lỗi xử lý đăng nhập Google. Vui lòng thử lại.", HttpStatus.INTERNAL_SERVER_ERROR),;
 
     private int code;
     private String message;
