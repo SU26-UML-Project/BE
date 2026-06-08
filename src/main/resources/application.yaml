@@ -36,6 +36,21 @@ spring:
 jwt:
   signerKey: ${JWT_SIGNER_KEY}
 
+springdoc:
+  api-docs:
+    enabled: true
+    # OpenAPI JSON spec served at /api-docs.json (full URL: <context-path>/api-docs.json)
+    path: /api-docs.json
+  swagger-ui:
+    enabled: true
+    # Swagger UI served at /api-docs (full URL: <context-path>/api-docs)
+    path: /api-docs
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+  show-actuator: false
+  default-produces-media-type: application/json
+
 management:
   endpoints:
     web:

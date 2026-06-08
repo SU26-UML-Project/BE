@@ -31,6 +31,13 @@ public class SecurityConfig {
             "/users/verify-otp",
             "/users/reset-password",
             "/actuator/health",
+            // Swagger / OpenAPI
+            "/api-docs",
+            "/api-docs.json",
+            "/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html",
+            "/v3/api-docs/**",
     };
 
 //    @Value("${jwt.signerKey}")
