@@ -82,27 +82,27 @@ BE/
 Tạo file `.env` từ `.env.example` rồi điền đầy đủ:
 
 ```env
-APP_NAME=uml-diagram-be
-SERVER_PORT=8088
-CONTEXT_PATH=/api/uml
+APP_NAME=
+SERVER_PORT=
+CONTEXT_PATH=
 
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=UML_DIAGRAM
-DB_USERNAME=postgres
-DB_PASSWORD=your_password
+DB_HOST=
+DB_PORT=
+DB_NAME=
+DB_USERNAME=
+DB_PASSWORD=
 
-APP_TIMEZONE=Asia/Ho_Chi_Minh
+APP_TIMEZONE=
 
-PGADMIN_EMAIL=admin@example.com
-PGADMIN_PASSWORD=your_pgadmin_password
-PGADMIN_PORT=5050
+PGADMIN_EMAIL=
+PGADMIN_PASSWORD=
+PGADMIN_PORT=
 
-JWT_SIGNER_KEY=your_secret_key_min_32_chars
+JWT_SIGNER_KEY=your_secret_key
 
 # Tuỳ chọn — có giá trị mặc định nếu bỏ qua
-JWT_ACCESS_TOKEN_EXPIRATION=3600      # giây, mặc định 1 giờ
-JWT_REFRESH_TOKEN_EXPIRATION=604800   # giây, mặc định 7 ngày
+JWT_ACCESS_TOKEN_EXPIRATION=
+JWT_REFRESH_TOKEN_EXPIRATION=
 ```
 
 ---
