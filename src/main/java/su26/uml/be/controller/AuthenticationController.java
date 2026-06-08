@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -39,9 +40,10 @@ public class AuthenticationController {
     @Operation(
             summary = "Authenticate and obtain a JWT",
             description = "Validates username/password and returns a signed HS512 JWT (valid for 1 hour). "
-                    + "Public endpoint — no Bearer token required.",
-            security = {}
+                    + "Public endpoint — no Bearer token required."
     )
+
+    @SecurityRequirements({})
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = @Content(schema = @Schema(implementation = LoginRequest.class),
@@ -77,9 +79,9 @@ public class AuthenticationController {
     @Operation(
             summary = "Introspect (validate) a JWT",
             description = "Returns whether the supplied token is structurally valid, correctly signed, "
-                    + "unexpired and not blacklisted. Public endpoint.",
-            security = {}
+                    + "unexpired and not blacklisted. Public endpoint."
     )
+    @SecurityRequirements({})
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = @Content(schema = @Schema(implementation = IntrospectRequest.class),
@@ -105,9 +107,9 @@ public class AuthenticationController {
     @Operation(
             summary = "Log out (invalidate a JWT)",
             description = "Blacklists the supplied token until its natural expiry so it can no longer be used. "
-                    + "Public endpoint — the token itself identifies the session.",
-            security = {}
+                    + "Public endpoint — the token itself identifies the session."
     )
+    @SecurityRequirements({})
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = @Content(schema = @Schema(implementation = LogoutRequest.class),
@@ -135,9 +137,9 @@ public class AuthenticationController {
             summary = "Check whether an account is locked",
             description = "Looks up a user by username or email and reports whether the account is in the LOCKED state. "
                     + "Public endpoint. Always returns 200, even when the identifier does not match any account "
-                    + "(reported as locked: false) to avoid user enumeration.",
-            security = {}
+                    + "(reported as locked: false) to avoid user enumeration."
     )
+    @SecurityRequirements({})
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lock status returned.",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class),

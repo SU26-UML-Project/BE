@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -31,9 +32,9 @@ public class UserController {
     @Operation(
             summary = "Register a new user account",
             description = "Creates a new user from the supplied details after validating uniqueness "
-                    + "(username, email) and the assigned role. Public endpoint — no Bearer token required.",
-            security = {}
+                    + "(username, email) and the assigned role. Public endpoint — no Bearer token required."
     )
+    @SecurityRequirements({})
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = @Content(schema = @Schema(implementation = UserRegisterRequest.class),

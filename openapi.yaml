@@ -1,0 +1,487 @@
+openapi: 3.1.0
+info:
+  title: UML Diagram Studio API
+  description: |-
+    REST API for the DiaUML Studio platform: authentication (HS512 JWT),
+    user registration and account management.
+
+    **Authentication**
+
+    1. Call `POST /auth/login` with valid credentials to obtain a JWT.
+    2. Click **Authorize** and paste the token to call protected endpoints.
+
+    All responses are wrapped in a standard envelope: `{ code, message, result }`.
+  contact:
+    name: SU26 UML Project Team
+    email: uml-admin@educare.com
+  license:
+    name: Proprietary
+  version: 0.0.1-SNAPSHOT
+servers:
+- url: http://localhost:8088/api/uml
+  description: Local development server
+security:
+- bearerAuth: []
+tags:
+- name: Users
+  description: User registration and account management.
+- name: Authentication
+  description: "Login, token introspection, logout and account status checks."
+paths:
+  /users/register:
+    post:
+      tags:
+      - Users
+      summary: Register a new user account
+      description: "Creates a new user from the supplied details after validating\
+        \ uniqueness (username, email) and the assigned role. Public endpoint — no\
+        \ Bearer token required."
+      operationId: register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRegisterRequest"
+            example:
+              username: johndoe
+              password: Passw0rd
+              fullName: John Doe
+              email: john.doe@gmail.com
+              phone: "0901234567"
+              roleId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        required: true
+      responses:
+        "200":
+          description: User registered successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+              example:
+                code: 200
+                message: Đăng ký thành công
+                result:
+                  userID: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                  username: johndoe
+                  fullName: John Doe
+                  email: john.doe@gmail.com
+                  phone: "0901234567"
+                  status: ACTIVE
+                  role:
+                    roleID: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                    roleName: USER
+                    description: Standard application user
+        "400":
+          description: "Validation failed or duplicate username/email (USER_EXISTED,\
+            \ EMAIL_EXISTED, INVALID_PASSWORD, INVALID_EMAIL_FORMAT, INVALID_PHONE,\
+            \ ...)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: 1002
+                message: "Username đã được sử dụng, hãy sử dụng username khác!"
+                result: null
+        "404":
+          description: Assigned role does not exist (ROLE_NOT_FOUND).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security: []
+  /auth/logout:
+    post:
+      tags:
+      - Authentication
+      summary: Log out (invalidate a JWT)
+      description: Blacklists the supplied token until its natural expiry so it can
+        no longer be used. Public endpoint — the token itself identifies the session.
+      operationId: logout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequest"
+            example:
+              token: eyJhbGciOiJIUzUxMiJ9...
+        required: true
+      responses:
+        "200":
+          description: Token invalidated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+              example:
+                code: 0
+                message: null
+                result: null
+        "400":
+          description: Malformed / unparseable token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token signature invalid or already expired (UNAUTHENTICATED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security: []
+  /auth/login:
+    post:
+      tags:
+      - Authentication
+      summary: Authenticate and obtain a JWT
+      description: Validates username/password and returns a signed HS512 JWT (valid
+        for 1 hour). Public endpoint — no Bearer token required.
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              username: johndoe
+              password: Passw0rd
+        required: true
+      responses:
+        "200":
+          description: Authentication succeeded; JWT returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthenticationResponse"
+              example:
+                code: 200
+                message: null
+                result:
+                  token: eyJhbGciOiJIUzUxMiJ9...
+                  authenticated: true
+        "401":
+          description: Invalid credentials (USER_NOT_FOUND / INVALID_CREDENTIALS).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Account is locked (USER_INACTIVE).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security: []
+  /auth/introspect:
+    post:
+      tags:
+      - Authentication
+      summary: Introspect (validate) a JWT
+      description: "Returns whether the supplied token is structurally valid, correctly\
+        \ signed, unexpired and not blacklisted. Public endpoint."
+      operationId: introspect
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntrospectRequest"
+            example:
+              token: eyJhbGciOiJIUzUxMiJ9...
+        required: true
+      responses:
+        "200":
+          description: "Introspection result returned (valid: true|false)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntrospectResponse"
+              example:
+                code: 200
+                message: null
+                result:
+                  valid: true
+        "400":
+          description: Malformed token / unparseable request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security: []
+  /auth/account-status:
+    get:
+      tags:
+      - Authentication
+      summary: Check whether an account is locked
+      description: "Looks up a user by username or email and reports whether the account\
+        \ is in the LOCKED state. Public endpoint. Always returns 200, even when the\
+        \ identifier does not match any account (reported as locked: false) to avoid\
+        \ user enumeration."
+      operationId: accountStatus
+      parameters:
+      - name: identifier
+        in: query
+        description: Username or email to look up.
+        required: true
+        schema:
+          type: string
+        example: johndoe
+      responses:
+        "200":
+          description: Lock status returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+              example:
+                code: 0
+                message: null
+                result:
+                  locked: false
+        "500":
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security: []
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      description: Standard error envelope returned for all non-2xx responses.
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Application-specific error code (see ErrorCode enum). Not the
+            HTTP status.
+          example: 1006
+        message:
+          type: string
+          description: Human-readable error message.
+          example: Tên đăng nhập hoặc mật khẩu không đúng
+        result:
+          type: object
+          description: Always null for error responses.
+    UserRegisterRequest:
+      type: object
+      description: Payload for registering a new user account.
+      properties:
+        username:
+          type: string
+          description: "Unique username, 3-100 characters."
+          example: johndoe
+          maxLength: 100
+          minLength: 3
+        password:
+          type: string
+          description: "Min 6 chars, must contain at least one letter and one digit."
+          example: Passw0rd
+          maxLength: 2147483647
+          minLength: 6
+          pattern: "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d@$!%*#?&]{6,}$"
+        fullName:
+          type: string
+          description: "Display name, up to 255 characters."
+          example: John Doe
+          maxLength: 255
+          minLength: 0
+        email:
+          type: string
+          description: "Unique, valid email address."
+          example: john.doe@gmail.com
+          minLength: 1
+          pattern: "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}$"
+        phone:
+          type: string
+          description: "Phone number, 10-11 digits."
+          example: "0901234567"
+          pattern: "^[0-9]{10,11}$"
+        roleId:
+          type: string
+          format: uuid
+          description: UUID of the role to assign to the user.
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+      required:
+      - email
+      - fullName
+      - password
+      - roleId
+      - username
+    RoleResponse:
+      type: object
+      description: Role assigned to a user.
+      properties:
+        roleID:
+          type: string
+          format: uuid
+          description: Unique role identifier.
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        roleName:
+          type: string
+          description: Role name.
+          example: USER
+        description:
+          type: string
+          description: Role description.
+          example: Standard application user
+    UserResponse:
+      type: object
+      description: User account details.
+      properties:
+        userID:
+          type: string
+          format: uuid
+          description: Unique user identifier.
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        username:
+          type: string
+          description: Account username.
+          example: johndoe
+        fullName:
+          type: string
+          description: Display name.
+          example: John Doe
+        email:
+          type: string
+          description: Email address.
+          example: john.doe@gmail.com
+        phone:
+          type: string
+          description: Phone number.
+          example: "0901234567"
+        password:
+          type: string
+          description: Hashed password (BCrypt).
+          readOnly: true
+        status:
+          type: string
+          description: Account status.
+          enum:
+          - ACTIVE
+          - LOCKED
+          example: ACTIVE
+        avatarUrl:
+          type: string
+          description: Avatar image URL.
+          example: https://cdn.example.com/avatars/johndoe.png
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp.
+          example: 2026-06-08T09:30:00
+        lastPasswordChangeAt:
+          type: string
+          format: date-time
+          description: Timestamp of the last password change.
+          example: 2026-06-08T09:30:00
+        role:
+          $ref: "#/components/schemas/RoleResponse"
+          description: Role assigned to the user.
+    LogoutRequest:
+      type: object
+      description: Wraps the JWT to invalidate.
+      properties:
+        token:
+          type: string
+          description: The JWT to invalidate (blacklist until expiry).
+          example: eyJhbGciOiJIUzUxMiJ9...
+      required:
+      - token
+    ApiResponse:
+      type: object
+      description: Standard response envelope wrapping every endpoint result.
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Application status code (200 = success; see ErrorCode enum
+            for errors).
+          example: 200
+        message:
+          type: string
+          description: Human-readable message.
+          example: Success
+        result:
+          description: Payload of the response; null when there is no body.
+    LoginRequest:
+      type: object
+      description: Credentials used to obtain a JWT.
+      properties:
+        username:
+          type: string
+          description: Account username.
+          example: johndoe
+          minLength: 1
+        password:
+          type: string
+          description: Account password.
+          example: Passw0rd
+          minLength: 1
+      required:
+      - password
+      - username
+    AuthenticationResponse:
+      type: object
+      description: Result of a successful login.
+      properties:
+        token:
+          type: string
+          description: "Signed HS512 JWT. Use as 'Authorization: Bearer <token>'."
+          example: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIn0...
+        authenticated:
+          type: boolean
+          description: True when authentication succeeded.
+          example: true
+    IntrospectRequest:
+      type: object
+      description: Wraps a JWT to be validated.
+      properties:
+        token:
+          type: string
+          description: The JWT to introspect.
+          example: eyJhbGciOiJIUzUxMiJ9...
+      required:
+      - token
+    IntrospectResponse:
+      type: object
+      description: Result of token introspection.
+      properties:
+        valid:
+          type: boolean
+          description: True when the supplied token is valid and not blacklisted.
+          example: true
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: |-
+        Paste the JWT returned by `POST /auth/login` (the `result.token` field).
+        Swagger sends it as the `Authorization: Bearer <token>` header on protected endpoints.
+      name: bearerAuth
+      scheme: bearer
+      bearerFormat: JWT

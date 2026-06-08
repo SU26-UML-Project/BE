@@ -34,6 +34,8 @@ public class SecurityConfig {
             // Swagger / OpenAPI
             "/api-docs",
             "/api-docs.json",
+            "/api-docs.json.yaml",
+            "/api-docs.yaml",
             "/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",

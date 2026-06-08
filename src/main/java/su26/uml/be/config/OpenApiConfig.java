@@ -17,13 +17,6 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
-/**
- * Central OpenAPI / Swagger configuration for the UML Diagram backend.
- *
- * <p>Defines API metadata, the public server base URL, a global Bearer (JWT) security
- * scheme so protected endpoints can be exercised straight from the Swagger UI, and a
- * reusable {@code ErrorResponse} schema shared by every error response.</p>
- */
 @Configuration
 public class OpenApiConfig {
 
