@@ -1,4 +1,4 @@
-package su26.uml.be.config;
+package su26.uml.be.config.security;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

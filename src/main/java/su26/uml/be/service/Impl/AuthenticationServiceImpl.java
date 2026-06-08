@@ -194,6 +194,25 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .build();
     }
 
+    @Override
+    public AuthenticationResponse generateTokenForOAuth2User(User user) {
+        if ("LOCKED".equalsIgnoreCase(user.getStatus())) {
+            throw new AppException(ErrorCode.USER_INACTIVE);
+        }
+
+        user.setLastActiveAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        var token = generateToken(user);
+        var refreshToken = generateRefreshToken(user);
+
+        return AuthenticationResponse.builder()
+                .token(token)
+                .refreshToken(refreshToken)
+                .authenticated(true)
+                .build();
+    }
+
     private String generateToken(User user) {
         try {
             JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);

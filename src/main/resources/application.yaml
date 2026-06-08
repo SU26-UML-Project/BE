@@ -33,10 +33,26 @@ spring:
   jackson:
     time-zone: ${APP_TIMEZONE}
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - openid
+              - email
+              - profile
+
 jwt:
   signerKey: ${JWT_SIGNER_KEY}
   accessTokenExpiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600}
   refreshTokenExpiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800}
+
+app:
+  oauth2:
+    frontend-callback-url: ${FRONTEND_CALLBACK_URL}
 
 springdoc:
   api-docs:

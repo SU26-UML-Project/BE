@@ -27,7 +27,7 @@ public class User {
     @Column(name = "user_name", nullable = false, unique = true)
     String username;
 
-    @Column(name = "password", nullable = false)
+    @Column(name = "password")
     String password;
 
     @Column(name = "full_name", nullable = false, length = 100)
@@ -36,8 +36,14 @@ public class User {
     @Column(name = "email", nullable = false, unique = true)
     String email;
 
-    @Column(name = "phone", nullable = false)
+    @Column(name = "phone")
     String phone;
+
+    @Column(name = "provider", length = 20)
+    String provider;
+
+    @Column(name = "google_id", unique = true)
+    String googleId;
 
     @ManyToOne
     @JoinColumn(name = "role_id", nullable = false)
