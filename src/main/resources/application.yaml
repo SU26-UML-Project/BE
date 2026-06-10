@@ -16,6 +16,12 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: ${REDIS_TIMEOUT:2000ms}
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -53,6 +59,14 @@ jwt:
 app:
   oauth2:
     frontend-callback-url: ${FRONTEND_CALLBACK_URL}
+  auth:
+    cookie:
+      refresh-token-name: ${AUTH_COOKIE_NAME:refresh_token}
+      # Bật true khi chạy HTTPS (production). Trên http://localhost để false.
+      secure: ${AUTH_COOKIE_SECURE:false}
+      # Lax cho dev (FE/BE cùng site localhost). Cross-site production dùng None + secure=true.
+      same-site: ${AUTH_COOKIE_SAME_SITE:Lax}
+      path: ${AUTH_COOKIE_PATH:/}
 
 springdoc:
   api-docs:

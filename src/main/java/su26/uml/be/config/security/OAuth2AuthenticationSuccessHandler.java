@@ -32,6 +32,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     UserRepository userRepository;
     RoleRepository roleRepository;
     AuthenticationService authenticationService;
+    CookieUtils cookieUtils;
 
     @NonFinal
     @Value("${app.oauth2.frontend-callback-url}")
@@ -69,10 +70,11 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
             clearAuthenticationAttributes(request);
 
-            String redirectUrl = frontendCallbackUrl
-                    + "?token="        + URLEncoder.encode(authResponse.getToken(), StandardCharsets.UTF_8)
-                    + "&refreshToken=" + URLEncoder.encode(authResponse.getRefreshToken(), StandardCharsets.UTF_8);
+            // Đặt refresh token vào cookie HttpOnly — KHÔNG nhét token lên URL nữa.
+            // FE sau khi nhận redirect sẽ gọi /auth/refresh để lấy access token (trả trong body).
+            cookieUtils.addRefreshTokenCookie(response, authResponse.getRefreshToken());
 
+            String redirectUrl = frontendCallbackUrl + "?login=success";
             getRedirectStrategy().sendRedirect(request, response, redirectUrl);
 
         } catch (Exception e) {

@@ -15,6 +15,7 @@ import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.repository.RoleRepository;
 import su26.uml.be.repository.UserRepository;
+import su26.uml.be.service.CustomOAuth2UserService;
 
 import su26.uml.be.config.security.CustomOAuth2User;
 
@@ -25,7 +26,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-public class CustomOAuth2UserService extends DefaultOAuth2UserService {
+public class CustomOAuth2UserServiceImpl extends DefaultOAuth2UserService implements CustomOAuth2UserService {
 
     UserRepository userRepository;
     RoleRepository roleRepository;

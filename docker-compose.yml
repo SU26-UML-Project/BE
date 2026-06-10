@@ -45,6 +45,15 @@ services:
     depends_on:
       - postgres-db
 
+  redis:
+    image: redis:7-alpine
+    container_name: uml_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
   qdrant:
     image: qdrant/qdrant:latest
     container_name: uml_qdrant
@@ -70,5 +79,6 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   qdrant_data:
   anythingllm_data:

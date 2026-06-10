@@ -1,5 +1,6 @@
 package su26.uml.be.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -9,6 +10,7 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(name = "AuthenticationResponse", description = "Result of a successful login.")
 public class AuthenticationResponse {
     @Schema(description = "Signed HS512 JWT. Use as 'Authorization: Bearer <token>'.",
@@ -18,5 +20,7 @@ public class AuthenticationResponse {
     @Schema(description = "True when authentication succeeded.", example = "true")
     boolean authenticated;
 
+    @Schema(description = "Internal only — delivered via HttpOnly cookie, omitted from the response body.",
+            hidden = true)
     String refreshToken;
 }

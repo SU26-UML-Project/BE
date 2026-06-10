@@ -1,6 +1,8 @@
 package su26.uml.be.controller;
 
 import com.nimbusds.jose.JOSEException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -12,14 +14,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import su26.uml.be.dto.request.IntrospectRequest;
 import su26.uml.be.dto.request.LoginRequest;
 import su26.uml.be.dto.request.LogoutRequest;
-import su26.uml.be.dto.request.RefreshTokenRequest;
 import su26.uml.be.dto.response.AuthenticationResponse;
 import su26.uml.be.dto.response.IntrospectResponse;
-import su26.uml.be.repository.UserRepository;
 import su26.uml.be.service.AuthenticationService;
 import su26.uml.be.config.swagger.SwaggerExamples;
 
@@ -33,7 +34,6 @@ import java.util.Map;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Tag(name = "Authentication", description = "Login, token introspection, logout and account status checks.")
 public class AuthenticationController {
-    UserRepository userRepository;
     AuthenticationService authenticationService;
 
     @PostMapping("/login")
@@ -48,32 +48,28 @@ public class AuthenticationController {
     @ApiResponse(responseCode = "200", description = "Authentication succeeded; JWT returned.",
             content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
                     examples = @ExampleObject(value = SwaggerExamples.LOGIN_RESPONSE)))
-    su26.uml.be.dto.response.ApiResponse<AuthenticationResponse> login(@RequestBody LoginRequest request) {
-        var result = authenticationService.authenticate(request);
+    su26.uml.be.dto.response.ApiResponse<AuthenticationResponse> login(@RequestBody LoginRequest request,
+                                                                       HttpServletResponse response) {
         return su26.uml.be.dto.response.ApiResponse.<AuthenticationResponse>builder()
-                .result(result)
+                .result(authenticationService.authenticate(request, response))
                 .build();
     }
 
     @PostMapping("/refresh")
     @Operation(
             summary = "Refresh access token",
-            description = "Exchanges a valid REFRESH token for a new ACCESS token and a new REFRESH token. " +
-                    "The supplied refresh token is immediately blacklisted after use (rotation). " +
-                    "Passing an ACCESS token or an already-used token will return 401."
+            description = "Reads the REFRESH token from the HttpOnly cookie, rotates it (the old one is " +
+                    "immediately blacklisted) and returns a new ACCESS token in the body plus a new REFRESH " +
+                    "token in a fresh HttpOnly cookie. Missing/expired/already-used cookie returns 401."
     )
     @SecurityRequirements({})
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            content = @Content(schema = @Schema(implementation = RefreshTokenRequest.class),
-                    examples = @ExampleObject(value = SwaggerExamples.REFRESH_REQUEST)))
-    @ApiResponse(responseCode = "200", description = "New access token and refresh token returned.",
+    @ApiResponse(responseCode = "200", description = "New access token returned; refresh token set as cookie.",
             content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
                     examples = @ExampleObject(value = SwaggerExamples.REFRESH_RESPONSE)))
-    su26.uml.be.dto.response.ApiResponse<AuthenticationResponse> refreshToken(@RequestBody RefreshTokenRequest request)
-            throws ParseException, JOSEException {
-        var result = authenticationService.refreshToken(request);
+    su26.uml.be.dto.response.ApiResponse<AuthenticationResponse> refreshToken(HttpServletRequest httpRequest,
+                                                                              HttpServletResponse response) {
         return su26.uml.be.dto.response.ApiResponse.<AuthenticationResponse>builder()
-                .result(result)
+                .result(authenticationService.refreshToken(httpRequest, response))
                 .build();
     }
 
@@ -110,13 +106,16 @@ public class AuthenticationController {
     @ApiResponse(responseCode = "200", description = "Token invalidated.",
             content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
                     examples = @ExampleObject(value = SwaggerExamples.LOGOUT_RESPONSE)))
-    su26.uml.be.dto.response.ApiResponse<Void> logout(@RequestBody LogoutRequest request)
+    su26.uml.be.dto.response.ApiResponse<Void> logout(
+            @RequestBody(required = false) LogoutRequest request, HttpServletRequest httpRequest, HttpServletResponse response)
             throws ParseException, JOSEException {
-        authenticationService.logout(request);
+        authenticationService.logout(request, httpRequest, response);
+
         return su26.uml.be.dto.response.ApiResponse.<Void>builder()
                 .build();
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/account-status")
     @Operation(
             summary = "Check whether an account is locked",
@@ -130,19 +129,8 @@ public class AuthenticationController {
     su26.uml.be.dto.response.ApiResponse<Map<String, Object>> accountStatus(
             @Parameter(description = "Username or email address to look up.", required = true, example = "johndoe")
             @RequestParam("identifier") String identifier) {
-        var normalized = identifier == null ? "" : identifier.trim();
-
-        var userOpt = userRepository.findByUsername(normalized);
-        if (userOpt.isEmpty()) {
-            userOpt = userRepository.findByEmail(normalized);
-        }
-
-        boolean locked = userOpt
-                .map(user -> "LOCKED".equalsIgnoreCase(user.getStatus()))
-                .orElse(false);
-
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("locked", locked);
+        result.put("LOCKED", authenticationService.isAccountLocked(identifier));
 
         return su26.uml.be.dto.response.ApiResponse.<Map<String, Object>>builder()
                 .result(result)
