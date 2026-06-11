@@ -6,6 +6,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import su26.uml.be.dto.request.UserRegisterRequest;
 import su26.uml.be.dto.response.ApiResponse;
 import su26.uml.be.dto.response.UserResponse;
@@ -18,10 +19,14 @@ import su26.uml.be.repository.RoleRepository;
 import su26.uml.be.repository.UserRepository;
 import su26.uml.be.service.UserService;
 
+import java.util.List;
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
+@Transactional
 public class UserServiceImpl implements UserService {
     UserRepository userRepository;
     RoleRepository roleRepository;
@@ -51,5 +56,28 @@ public class UserServiceImpl implements UserService {
         UserResponse userResponse = userMapper.toUserResponse(savedUser);
 //        resolveAvatar(userResponse);
         return ApiResponse.success("Đăng ký tài khoản thành công", userResponse);
+    }
+
+    @Override
+    public ApiResponse<List<UserResponse>> getAllUsers() {
+        List<User> users = userRepository.findAll();
+
+        if (users.isEmpty()) {
+            throw new AppException(ErrorCode.USER_LIST_EMPTY);
+        }
+
+        List<UserResponse> userResponses = userMapper.toUserResponseList(users);
+//        resolveAvatar(userResponses);
+        return ApiResponse.success("Lấy danh sách người dùng thành công", userResponses);
+    }
+
+    @Override
+    public ApiResponse<UserResponse> getUserById(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        UserResponse userResponse = userMapper.toUserResponse(user);
+//        resolveAvatar(userResponse);
+        return ApiResponse.success("Lấy thông tin Người dùng thành công", userResponse);
     }
 }

@@ -9,15 +9,16 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
+import su26.uml.be.config.security.CustomOAuth2User;
+import su26.uml.be.dto.request.OAuth2UserInfo;
 import su26.uml.be.entity.Role;
 import su26.uml.be.entity.User;
 import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
+import su26.uml.be.mapper.OAuth2UserMapper;
 import su26.uml.be.repository.RoleRepository;
 import su26.uml.be.repository.UserRepository;
 import su26.uml.be.service.CustomOAuth2UserService;
-
-import su26.uml.be.config.security.CustomOAuth2User;
 
 import java.util.Collections;
 import java.util.Map;
@@ -30,6 +31,7 @@ public class CustomOAuth2UserServiceImpl extends DefaultOAuth2UserService implem
 
     UserRepository userRepository;
     RoleRepository roleRepository;
+    OAuth2UserMapper oauth2UserMapper;
 
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
@@ -67,22 +69,19 @@ public class CustomOAuth2UserServiceImpl extends DefaultOAuth2UserService implem
     }
 
     private User linkGoogleAccount(User user, String googleId, String picture) {
-        boolean updated = false;
+        OAuth2UserInfo info = OAuth2UserInfo.builder()
+                .googleId(user.getGoogleId() == null ? googleId : null)
+                .provider(!"GOOGLE".equals(user.getProvider()) ? "GOOGLE" : null)
+                .avatarUrl(picture != null && user.getAvatarUrl() == null ? picture : null)
+                .build();
 
-        if (user.getGoogleId() == null) {
-            user.setGoogleId(googleId);
-            updated = true;
-        }
-        if (!"GOOGLE".equals(user.getProvider())) {
-            user.setProvider("GOOGLE");
-            updated = true;
-        }
-        if (picture != null && user.getAvatarUrl() == null) {
-            user.setAvatarUrl(picture);
-            updated = true;
-        }
+        oauth2UserMapper.updateGoogleFields(info, user);
 
-        return updated ? userRepository.save(user) : user;
+        boolean hasChanges = info.getGoogleId() != null
+                || info.getProvider() != null
+                || info.getAvatarUrl() != null;
+
+        return hasChanges ? userRepository.save(user) : user;
     }
 
     private User createGoogleUser(String email, String googleId, String name, String picture) {
@@ -99,7 +98,7 @@ public class CustomOAuth2UserServiceImpl extends DefaultOAuth2UserService implem
                 ? baseUsername + "_" + googleId.substring(0, 6)
                 : baseUsername;
 
-        User newUser = User.builder()
+        OAuth2UserInfo info = OAuth2UserInfo.builder()
                 .username(username)
                 .email(email)
                 .fullName(name != null ? name : baseUsername)
@@ -107,8 +106,10 @@ public class CustomOAuth2UserServiceImpl extends DefaultOAuth2UserService implem
                 .provider("GOOGLE")
                 .avatarUrl(picture)
                 .status("ACTIVE")
-                .role(defaultRole)
                 .build();
+
+        User newUser = oauth2UserMapper.toUser(info);
+        newUser.setRole(defaultRole);
 
         User saved = userRepository.save(newUser);
         log.info("Tạo user mới từ Google OAuth2: {}", email);

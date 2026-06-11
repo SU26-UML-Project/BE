@@ -6,6 +6,8 @@ import su26.uml.be.dto.request.UserRegisterRequest;
 import su26.uml.be.dto.response.UserResponse;
 import su26.uml.be.entity.User;
 
+import java.util.List;
+
 @Mapper(componentModel = "spring")
 public interface UserMapper {
     User toUser(UserRegisterRequest request);
@@ -14,4 +16,6 @@ public interface UserMapper {
     @Mapping(target = "createdAt", source = "createdAt")
 //    @Mapping(target = "avatarUrl", source = "avatarUrl")
     UserResponse toUserResponse(User user);
+
+    List<UserResponse> toUserResponseList(List<User> users);
 }

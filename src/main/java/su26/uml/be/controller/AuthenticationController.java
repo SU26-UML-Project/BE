@@ -122,7 +122,6 @@ public class AuthenticationController {
             description = "Looks up a user by username or email and reports whether the account is in the LOCKED state. " +
                     "Always returns 200 — unknown identifiers are reported as locked: false to avoid user enumeration."
     )
-    @SecurityRequirements({})
     @ApiResponse(responseCode = "200", description = "Lock status returned.",
             content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
                     examples = @ExampleObject(value = SwaggerExamples.ACCOUNT_STATUS_RESPONSE)))

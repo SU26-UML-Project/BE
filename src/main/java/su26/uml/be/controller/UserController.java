@@ -11,14 +11,15 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 import su26.uml.be.config.swagger.SwaggerExamples;
 import su26.uml.be.dto.request.UserRegisterRequest;
 import su26.uml.be.dto.response.UserResponse;
 import su26.uml.be.service.UserService;
+
+import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/users")
@@ -43,5 +44,17 @@ public class UserController {
                     examples = @ExampleObject(value = SwaggerExamples.REGISTER_RESPONSE)))
     public su26.uml.be.dto.response.ApiResponse<UserResponse> register(@Valid @RequestBody UserRegisterRequest request) {
         return userService.registerUser(request);
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public su26.uml.be.dto.response.ApiResponse<List<UserResponse>> getAllUsers() {
+        return userService.getAllUsers();
+    }
+
+    @GetMapping("/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public su26.uml.be.dto.response.ApiResponse<UserResponse> getUserById(@PathVariable UUID userId) {
+        return userService.getUserById(userId);
     }
 }

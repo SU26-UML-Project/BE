@@ -259,7 +259,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     .expirationTime(new Date(
                             Instant.now().plusSeconds(ACCESS_TOKEN_EXPIRATION).toEpochMilli()
                     ))
-                    .claim("userID", user.getUserID())
+                    .claim("userId", user.getUserID())
                     .claim("fullName", user.getFullName())
                     .claim("email", user.getEmail())
                     .jwtID(UUID.randomUUID().toString())
