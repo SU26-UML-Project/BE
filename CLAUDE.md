@@ -20,8 +20,8 @@
 | Spring Boot Starter Validation | (Boot-managed) |
 | Spring Boot Starter Actuator | (Boot-managed) |
 | Spring Boot Starter Mail | (Boot-managed) |
-| Spring Boot Starter Data Redis | (Boot-managed) — ACCESS token blacklist |
-| Spring Boot OAuth2 Resource Server | (Boot-managed) — brings in Nimbus JOSE JWT |
+| Spring Boot Starter Data Redis | (Boot-managed) — ACCESS token blacklist + REFRESH token tracking |
+| Spring Boot OAuth2 Resource Server | (Boot-managed) — present in pom for Nimbus JOSE JWT only; **NOT used as a resource server** (no `oauth2ResourceServer` config) |
 | Spring Boot OAuth2 Client | (Boot-managed) — Google OAuth2 login |
 | PostgreSQL JDBC | (Boot-managed, runtime) |
 | Microsoft SQL Server JDBC | (Boot-managed, runtime) — present in pom but not configured |
@@ -43,16 +43,21 @@ BE/
     ├── config/
     │   ├── RedisConfig.java                 — RedisTemplate<String,String> bean
     │   ├── TimezoneVerificationConfig.java  — Timezone setup on startup
-    │   ├── TokenCleanupTask.java            — @Scheduled 03:00 daily: prune expired refresh_tokens
+    │   ├── TokenCleanupTask.java            — @Deprecated/DISABLED (commented out); refresh tokens now expire via Redis TTL
     │   ├── security/
-    │   │   ├── CookieUtils.java             — HttpOnly refresh-token cookie: set / clear / extract
-    │   │   ├── CustomJwtDecoder.java        — JwtDecoder bean; Redis blacklist + tokenType check
+    │   │   ├── CookieUtils.java             — HttpOnly access + refresh cookie: set / clear / extract
+    │   │   ├── JwtService.java              — generate (HS512) + parseClaims (verify signature + expiry) via Nimbus
+    │   │   ├── JwtProperties.java           — @ConfigurationProperties(jwt.*): signerKey, accessTokenExpiration, refreshTokenExpiration
+    │   │   ├── JwtAuthenticationFilter.java — OncePerRequestFilter: verify token per request → set SecurityContext (THE active auth mechanism)
+    │   │   ├── RefreshTokenRedis.java       — REFRESH token JTI tracking in Redis: rt:{jti}→userId, user_rt:{userId} set, logout_time:{email}
+    │   │   ├── UserDetailService.java       — UserDetailsService: load user by email
+    │   │   ├── CustomJwtDecoder.java        — @Deprecated/DISABLED (commented out); old OAuth2 Resource Server JwtDecoder
     │   │   ├── CustomOAuth2User.java        — OAuth2User wrapper carrying email, name, picture
     │   │   ├── EncoderConfig.java           — BCryptPasswordEncoder bean (strength=10)
-    │   │   ├── JwtAuthenticationEntryPoint.java — 401 JSON for unauthenticated access
+    │   │   ├── JwtAuthenticationEntryPoint.java — @Deprecated/DISABLED (commented out); 401 now routed via handlerExceptionResolver
     │   │   ├── OAuth2AuthenticationFailureHandler.java — redirect FE with ?error=...
     │   │   ├── OAuth2AuthenticationSuccessHandler.java — issue JWT, set refresh cookie, redirect FE
-    │   │   └── SecurityConfig.java          — SecurityFilterChain, CORS, oauth2Login, PUBLIC_ENDPOINTS
+    │   │   └── SecurityConfig.java          — SecurityFilterChain, CORS, oauth2Login, PUBLIC_ENDPOINTS, jwtAuthenticationFilter
     │   └── swagger/
     │       ├── OpenApiConfig.java           — OpenAPI bean, global error responses, bearer scheme
     │       └── SwaggerExamples.java         — All Swagger @ExampleObject strings (constants only)
@@ -75,18 +80,18 @@ BE/
     ├── entity/
     │   ├── User.java                        — @Table("users"), UUID PK; password + phone nullable (Google users); fields: provider, googleId
     │   ├── Role.java                        — @Table("roles"), UUID PK, 1:N to User
-    │   ├── RefreshToken.java                — @Table("refresh_tokens"): opaque token hash + family-based reuse detection
+    │   ├── RefreshToken.java                — @Table("refresh_tokens") entity still mapped, but UNUSED by current flow (refresh tracking moved to Redis)
     │   └── InvalidatedToken.java            — @Deprecated; ACCESS token blacklist migrated to Redis
     ├── exception/
     │   ├── AppException.java                — Runtime exception carrying an ErrorCode
     │   ├── ErrorCode.java                   — Enum: code (int) + message (String) + HttpStatus
-    │   └── GlobalExceptionHandler.java      — @ControllerAdvice; handles AppException, validation, AccessDenied
+    │   └── GlobalExceptionHandler.java      — @ControllerAdvice; handles AppException, validation, AccessDenied, catch-all Exception (NOTE: no AuthenticationException/JwtException handler → auth failures currently fall through to 500)
     ├── mapper/
     │   └── UserMapper.java                  — MapStruct: UserRegisterRequest→User, User→UserResponse
     ├── repository/
     │   ├── UserRepository.java
     │   ├── RoleRepository.java              — + findByRoleName(String)
-    │   ├── RefreshTokenRepository.java      — findByTokenHash, revokeFamily(familyId), deleteExpired(now)
+    │   ├── RefreshTokenRepository.java      — @Deprecated/DISABLED (commented out); refresh tracking moved to Redis
     │   └── InvalidatedTokenRepository.java  — @Deprecated
     └── service/
         ├── AuthenticationService.java       — Interface
@@ -169,71 +174,78 @@ public interface UserMapper { ... }
 
 ## 4. Authentication Flow
 
+> **Architecture:** Tokens are verified by a hand-written `JwtAuthenticationFilter` + `JwtService`, **NOT** by Spring's OAuth2 Resource Server. `CustomJwtDecoder`, `JwtAuthenticationEntryPoint`, the `refresh_tokens` table, `RefreshTokenRepository`, and `TokenCleanupTask` are all commented out / unused. Refresh-token state lives in **Redis**, not the DB.
+
 ### ACCESS token structure (HS512, signed with `jwt.signerKey`)
 
 ```
-sub (= username), iss="DiaUML-Studio", iat, exp, jti, userID, fullName, email,
-scope="ROLE_<roleName>", role="ROLE_<roleName>", tokenType="ACCESS"
+sub (= email), iss="DiaUML-Studio", iat, exp, jti,
+uid (= userId), email, typ="access",
+scope="ROLE_<roleName>", role="ROLE_<roleName>"
 ```
-TTL: `jwt.accessTokenExpiration` seconds (default 3600 = 1 hour).
-Blacklist: Redis key `blacklist:{jti}` with TTL = remaining lifetime.
+- TTL: `jwt.accessTokenExpiration` seconds (default 3600 = 1 hour).
+- Delivered to the client as an **HttpOnly cookie** (`access_token`) AND accepted from the `Authorization: Bearer <token>` header (Swagger support).
+- Blacklist: Redis key `blacklist:{jti}` with TTL = remaining lifetime.
 
-### REFRESH token (opaque — NOT a JWT)
+### REFRESH token (also a JWT, `typ="refresh"`)
 
-A 256-bit Base64url random string sent to the client via **HttpOnly cookie** (`refresh_token`).
-Server stores only the SHA-256 hash in the `refresh_tokens` table alongside a `family_id`.
-Each login creates a new family; each refresh rotates within the same family.
-Reuse of an already-used/revoked token triggers full family revocation → 401.
+A signed HS512 JWT (same `JwtService`) sent to the client via **HttpOnly cookie** (`refresh_token`).
+Its `jti` is tracked in Redis (`rt:{jti}` → userId, plus a `user_rt:{userId}` set index).
+There is **no SHA-256 hash, no DB row, and no token family** — rotation works purely via the Redis `rt:{jti}` entry. Reuse of a rotated/revoked token fails because its `jti` is no longer in Redis → 401.
 
 ### Login — `POST /auth/login`
-1. Find user by username → `USER_NOT_FOUND` if missing.
+1. Find user **by email** (`LoginRequest.email`) → `USER_NOT_FOUND` if missing.
 2. BCrypt password check → `INVALID_CREDENTIALS` if wrong.
 3. Status check: `"LOCKED"` → `USER_INACTIVE`.
 4. Update `user.lastActiveAt`, save.
-5. Generate ACCESS token (JWT) + opaque REFRESH token (new family).
-6. Set refresh token as HttpOnly cookie via `CookieUtils`.
+5. Generate ACCESS token + REFRESH token (new random `jti`); store `jti` in Redis (`RefreshTokenRedis.store`).
+6. Set both access + refresh tokens as HttpOnly cookies via `CookieUtils`.
 7. Return `{token, authenticated: true}` — no `refreshToken` in body.
 
 ### Google OAuth2 Login — `GET /oauth2/authorization/google` (Spring-managed redirect)
 1. Spring redirects to Google consent screen.
 2. Google redirects to `/login/oauth2/code/google`.
 3. `CustomOAuth2UserServiceImpl` loads Google profile, finds or creates a local `User` (links by email if existing, default role = `"USER"`).
-4. `OAuth2AuthenticationSuccessHandler`: generates ACCESS token + opaque REFRESH, sets cookie, redirects FE to `FRONTEND_CALLBACK_URL?login=success`.
+4. `OAuth2AuthenticationSuccessHandler`: generates ACCESS + REFRESH tokens, sets cookies, redirects FE to `FRONTEND_CALLBACK_URL?login=success`.
 5. `OAuth2AuthenticationFailureHandler`: redirects FE to `FRONTEND_CALLBACK_URL?error=<message>`.
 6. FE must call `POST /auth/refresh` to get the access token after redirect.
 
 ### Refresh — `POST /auth/refresh` (public)
-1. Read opaque refresh token from HttpOnly cookie (cookie name = `AUTH_COOKIE_NAME`).
-2. Compute SHA-256 → look up `refresh_tokens` by hash.
-3. If `used` or `revoked` → **reuse detected** → `revokeFamily(familyId)` → 401.
-4. Mark old record `used=true`, create new record in same family.
-5. Set new refresh cookie, return `{token, authenticated: true}`.
+1. Read refresh JWT from HttpOnly cookie (`AUTH_COOKIE_NAME`) → `UNAUTHENTICATED` if missing.
+2. `JwtService.parseClaims` (verify signature + expiry) and check `typ == "refresh"`.
+3. Look up `jti` in Redis (`getUserIdByJti`) → `UNAUTHENTICATED` if absent (already rotated/revoked).
+4. Load user, reject if `"LOCKED"`.
+5. **Rotate:** revoke old `jti` in Redis, generate new ACCESS + REFRESH (new `jti`), store new `jti`.
+6. Set new access + refresh cookies, return `{token, authenticated: true}`.
 
 ### Introspect — `POST /auth/introspect` (public)
-- Checks Redis blacklist + tokenType == "ACCESS" + signature + expiry.
+- Calls `JwtService.parseClaims` only — verifies **signature + expiry**.
+- ⚠️ Does **NOT** check the Redis blacklist or logout-time → a logged-out/blacklisted token can still return `{valid: true}`. (Known inconsistency vs. the request filter.)
 - Returns `{valid: true|false}` — never throws to the caller.
 
 ### Logout — `POST /auth/logout` (public)
-1. Read refresh token from cookie → `revokeFamily(familyId)` (invalidates all family tokens in DB).
-2. Clear refresh cookie via `CookieUtils`.
-3. If access token provided in body (`LogoutRequest`): add JTI to Redis blacklist.
+1. Read refresh JWT from cookie → `parseClaims` → `RefreshTokenRedis.revoke(jti)` + `setLogoutTime(email)`.
+2. Clear both access + refresh cookies via `CookieUtils`.
+3. If an access token is provided in the body (`LogoutRequest`): blacklist its `jti` in Redis.
 
-### Protected request flow
+### Protected request flow (`JwtAuthenticationFilter`)
 ```
-Request → SecurityFilterChain
-       → CustomJwtDecoder.decode()
-           → TokenBlacklistService.isBlacklisted(jti)   ← Redis check
-           → verifies tokenType == "ACCESS"
-           → NimbusJwtDecoder.decode()
-       → JwtAuthenticationConverter
-           → reads claim "role" as authority (no added prefix, empty authorityPrefix)
-       → @EnableMethodSecurity enforces @PreAuthorize on method level
+Request → JwtAuthenticationFilter (addFilterBefore UsernamePasswordAuthenticationFilter)
+       → skip if path is /auth/login, /auth/refresh, /users/register
+       → extract token from access_token cookie, else Authorization: Bearer header
+       → JwtService.parseClaims()           ← verify signature + expiry
+       → require claim typ == "access"
+       → TokenBlacklistService.isBlacklisted(jti)         ← Redis check (clears cookies if hit)
+       → RefreshTokenRedis.getLogoutTime(email) vs iat    ← revoked-by-logout check
+       → UserDetailService.loadUserByUsername(email) → set SecurityContext (if user enabled)
+       → @EnableMethodSecurity enforces @PreAuthorize at method level
+   On parse error: clear cookies + handlerExceptionResolver.resolveException(...)
 ```
-Unauthenticated → `JwtAuthenticationEntryPoint` → JSON `{code:401, message:"..."}`.
+Unauthenticated / token error → `SecurityConfig` `authenticationEntryPoint` delegates to `handlerExceptionResolver` (→ `GlobalExceptionHandler`).
+> ⚠️ **Known issue:** `GlobalExceptionHandler` has no `AuthenticationException`/`JwtException` handler, so these currently fall through to the catch-all `Exception` handler → **HTTP 500 / code 9999** instead of a clean **401 UNAUTHENTICATED**. The old `JwtAuthenticationEntryPoint` (now disabled) used to produce the 401 JSON. To fully retire it, add an `@ExceptionHandler(AuthenticationException.class)` returning `ErrorCode.UNAUTHENTICATED`.
 
-### Scheduled cleanup — `TokenCleanupTask` (daily at 03:00)
-- Deletes expired rows from `refresh_tokens`.
-- (Redis TTL handles `blacklist:*` keys automatically — no manual cleanup needed.)
+### Scheduled cleanup
+- `TokenCleanupTask` is disabled — Redis TTL handles expiry of both `blacklist:{jti}` and `rt:{jti}` keys automatically.
 
 ---
 
@@ -256,7 +268,10 @@ Host:    REDIS_HOST (default: localhost)
 Port:    REDIS_PORT (default: 6379)
 Timeout: REDIS_TIMEOUT (default: 2000ms)
 ```
-Used exclusively for ACCESS token blacklist (`blacklist:{jti}` keys, TTL = remaining token lifetime).
+Used for:
+- ACCESS token blacklist — `blacklist:{jti}` keys, TTL = remaining token lifetime.
+- REFRESH token tracking — `rt:{jti}` → userId, `user_rt:{userId}` set index, TTL = refresh token lifetime.
+- Logout/password-change marker — `logout_time:{email}` (compared against token `iat` to revoke sessions).
 
 Run both via Docker: `docker compose up -d`.
 
@@ -288,16 +303,17 @@ Run both via Docker: `docker compose up -d`.
 | `role_name` | VARCHAR | unique, not null |
 | `description` | VARCHAR(1000) | nullable |
 
-**`refresh_tokens` table — `RefreshToken.java`**
+**`refresh_tokens` table — `RefreshToken.java` (UNUSED by current flow)**
+> The entity is still mapped (Hibernate may create the table via `ddl-auto: update`), but **no active code reads or writes it** — refresh-token state now lives in Redis (`rt:{jti}`). Columns below are legacy; kept for rollback safety.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID (PK) | `@UuidGenerator` |
-| `token_hash` | VARCHAR(64) | SHA-256 hex of the opaque token; unique |
-| `family_id` | UUID | groups tokens for one login session |
+| `token_hash` | VARCHAR(64) | legacy SHA-256 scheme (unused) |
+| `family_id` | UUID | legacy family scheme (unused) |
 | `user_id` | UUID | FK to users (not @JoinColumn, just UUID) |
 | `expiry_time` | INSTANT | token expiry |
-| `used` | BOOLEAN | true after this token has been rotated |
-| `revoked` | BOOLEAN | true when family is revoked (logout / reuse detected) |
+| `used` | BOOLEAN | legacy (unused) |
+| `revoked` | BOOLEAN | legacy (unused) |
 | `created_at` | TIMESTAMP | `@CreationTimestamp` |
 
 **`invalidated_token` table — `InvalidatedToken.java` (@Deprecated)**
@@ -375,7 +391,7 @@ http://localhost:8088/api/uml/login/oauth2/code/google
 
 5. **JWT signing algorithm is HS512** with `SIGNER_KEY`. Do not change the algorithm or the `JWSAlgorithm.HS512` constant.
 
-6. **The `role` claim in the ACCESS token must stay named `"role"`** — `JwtGrantedAuthoritiesConverter.setAuthoritiesClaimName("role")` depends on it. The authority prefix is empty string (no extra `ROLE_` prepended by Spring).
+6. **Token verification is hand-written** via `JwtAuthenticationFilter` + `JwtService.parseClaims` — the app is **not** configured as an OAuth2 Resource Server. The access-token type claim is `typ` (value `"access"`), and login/identity is keyed on **email** (`sub` = email). `CustomJwtDecoder` / `JwtAuthenticationEntryPoint` are disabled (commented out); do not assume Spring's `JwtDecoder`/`JwtAuthenticationConverter` pipeline is active.
 
 7. **Swagger example strings belong in `SwaggerExamples`** as public static final constants. Do not inline raw JSON strings in annotation attributes on controllers.
 
@@ -389,7 +405,7 @@ http://localhost:8088/api/uml/login/oauth2/code/google
 
 12. **Constructor injection via `@RequiredArgsConstructor`** is the convention for service and controller classes. Do not add field-level `@Autowired` to these classes.
 
-13. **Refresh token is opaque — never a JWT.** The raw token is never stored on the server; only its SHA-256 hex hash is persisted. Never log or return the raw token except as the HttpOnly cookie value.
+13. **Refresh token is a signed JWT (`typ="refresh"`), tracked by `jti` in Redis** (`RefreshTokenRedis`, key `rt:{jti}`). There is no DB row, SHA-256 hash, or token family. The `refresh_tokens` table / `RefreshToken` entity / `RefreshTokenRepository` are unused legacy. Never log or return the raw refresh token except as the HttpOnly cookie value.
 
 14. **`password` and `phone` are nullable on `User`.** Always null-check before using them. Google OAuth2 users will not have either field set.
 
@@ -397,4 +413,6 @@ http://localhost:8088/api/uml/login/oauth2/code/google
 
 16. **Config classes (`SecurityConfig`, `RedisConfig`) use field-level `@Autowired`**, not constructor injection. All other classes use `@RequiredArgsConstructor`.
 
-17. **`authenticate()`, `refreshToken()`, `generateTokenForOAuth2User()` in `AuthenticationServiceImpl` are `@Transactional`** — they write to `refresh_tokens`. Do not call them from another `@Transactional` context that you want to keep separate.
+17. **`authenticate()`, `refreshToken()`, `generateTokenForOAuth2User()` in `AuthenticationServiceImpl` are `@Transactional`** — they update `user.lastActiveAt` and write refresh-token state to Redis. Do not call them from another `@Transactional` context that you want to keep separate.
+
+18. **Auth-failure responses currently return 500/code 9999, not 401.** `GlobalExceptionHandler` lacks an `AuthenticationException`/`JwtException` handler, so the disabled `JwtAuthenticationEntryPoint` is not fully replaced. Add `@ExceptionHandler(AuthenticationException.class)` → `ErrorCode.UNAUTHENTICATED` before relying on clean 401s.

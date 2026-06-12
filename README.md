@@ -10,15 +10,15 @@ Backend REST API cho nền tảng **DiaUML Studio**, xây dựng bằng Spring B
 |---|---|
 | Java | 21 |
 | Spring Boot | 4.0.6 |
-| Spring Security + OAuth2 Resource Server | (Boot-managed) |
+| Spring Security | (Boot-managed) — xác thực qua filter JWT tự viết (không dùng Resource Server) |
 | Spring Security OAuth2 Client | (Boot-managed) — Google OAuth2 login |
 | Spring Data JPA + Hibernate | (Boot-managed) |
-| Spring Data Redis | (Boot-managed) — ACCESS token blacklist |
+| Spring Data Redis | (Boot-managed) — ACCESS token blacklist + REFRESH token tracking |
 | Spring Validation | (Boot-managed) |
 | Spring Actuator | (Boot-managed) |
 | PostgreSQL JDBC | (Boot-managed) |
 | Redis 7 | (Docker) |
-| Nimbus JOSE JWT | (via OAuth2 Resource Server) |
+| Nimbus JOSE JWT | (sinh + verify token trong `JwtService`) |
 | MapStruct | 1.5.5.Final |
 | Lombok | (Boot-managed) |
 | springdoc-openapi (Swagger UI) | 3.0.3 |
@@ -38,10 +38,15 @@ BE/
 │   │   ├── TokenCleanupTask.java
 │   │   ├── security/
 │   │   │   ├── CookieUtils.java
-│   │   │   ├── CustomJwtDecoder.java
+│   │   │   ├── JwtService.java                 ← sinh + verify token (HS512)
+│   │   │   ├── JwtProperties.java              ← cấu hình jwt.*
+│   │   │   ├── JwtAuthenticationFilter.java    ← filter xác thực mỗi request
+│   │   │   ├── RefreshTokenRedis.java          ← theo dõi refresh token trong Redis
+│   │   │   ├── UserDetailService.java
+│   │   │   ├── CustomJwtDecoder.java           ← DISABLED (comment)
 │   │   │   ├── CustomOAuth2User.java
 │   │   │   ├── EncoderConfig.java
-│   │   │   ├── JwtAuthenticationEntryPoint.java
+│   │   │   ├── JwtAuthenticationEntryPoint.java ← DISABLED (comment)
 │   │   │   ├── OAuth2AuthenticationFailureHandler.java
 │   │   │   ├── OAuth2AuthenticationSuccessHandler.java
 │   │   │   └── SecurityConfig.java
@@ -195,7 +200,7 @@ AnythingLLM: `http://localhost:3001`
 |---|---|---|---|
 | POST | `/auth/login` | Đăng nhập, access token trả body, refresh token set cookie HttpOnly | Public |
 | POST | `/auth/refresh` | Đọc refresh token từ cookie, rotate, trả access token mới | Public |
-| POST | `/auth/introspect` | Kiểm tra token còn hợp lệ không (Redis blacklist check) | Public |
+| POST | `/auth/introspect` | Kiểm tra chữ ký + hạn của token (⚠️ KHÔNG check Redis blacklist/logout) | Public |
 | POST | `/auth/logout` | Revoke refresh token family + xoá cookie; blacklist access token nếu gửi kèm | Public |
 | GET | `/auth/account-status` | Kiểm tra tài khoản có bị khoá không | ADMIN |
 
@@ -218,23 +223,24 @@ Sau khi redirect thành công, FE gọi `POST /auth/refresh` để lấy access 
 
 ## Cơ chế xác thực
 
+> Token được xác thực bằng **`JwtAuthenticationFilter` + `JwtService` tự viết** (không dùng OAuth2 Resource Server). Trạng thái refresh token nằm trong **Redis**, không phải DB. Đăng nhập bằng **email**.
+
 **Access token** — JWT HS512 (TTL: `JWT_ACCESS_TOKEN_EXPIRATION`, mặc định 1 giờ):
-- Gửi qua header: `Authorization: Bearer <token>`
-- Claims: `sub` (username), `userID`, `fullName`, `email`, `role`, `scope`, `tokenType="ACCESS"`
+- Set qua **HttpOnly cookie** (`access_token`) và cũng chấp nhận từ header `Authorization: Bearer <token>` (phục vụ Swagger).
+- Claims: `sub` (= email), `uid`, `email`, `role`, `scope`, `typ="access"`, `jti`, `iss`, `iat`, `exp`.
 - Blacklist: Redis key `blacklist:{jti}`, tự xoá khi hết TTL.
 
-**Refresh token** — Opaque 256-bit (TTL: `JWT_REFRESH_TOKEN_EXPIRATION`, mặc định 7 ngày):
-- **KHÔNG phải JWT**, không chứa thông tin người dùng.
-- Gửi/nhận qua **HttpOnly cookie** (không có trong body response).
-- Server lưu SHA-256 hash + `family_id` trong bảng `refresh_tokens`.
-- Mỗi lần refresh: rotate token, giữ nguyên family.
-- Phát hiện reuse (token đã dùng bị gửi lại): thu hồi toàn bộ family → 401.
+**Refresh token** — JWT HS512, `typ="refresh"` (TTL: `JWT_REFRESH_TOKEN_EXPIRATION`, mặc định 7 ngày):
+- Gửi/nhận qua **HttpOnly cookie** (không có trong body response của login/refresh).
+- `jti` được lưu trong Redis (`rt:{jti}` → userId). **Không** có SHA-256 hash, không có bảng DB, không có "family".
+- Mỗi lần refresh: rotate — revoke `jti` cũ trong Redis, sinh token mới với `jti` mới.
+- Token đã rotate/revoke gửi lại sẽ không còn `jti` trong Redis → 401.
 
 **Luồng đăng nhập thường:**
-1. `POST /auth/login` → nhận `token` (access) trong body; refresh token được set làm cookie.
-2. Dùng `token` cho các request cần xác thực.
+1. `POST /auth/login` (đăng nhập bằng **email** + password) → nhận `token` (access) trong body; access + refresh token được set làm cookie HttpOnly.
+2. Request cần xác thực dùng cookie `access_token` (hoặc header Bearer).
 3. Khi access token hết hạn → gọi `POST /auth/refresh` (không cần body) → nhận access token mới; cookie refresh tự động rotate.
-4. Đăng xuất → `POST /auth/logout` → cookie xoá, refresh family bị revoke.
+4. Đăng xuất → `POST /auth/logout` → cookie bị xoá; `jti` refresh bị revoke trong Redis + ghi `logout_time`.
 
 **Luồng Google OAuth2:**
 1. Redirect trình duyệt đến `/oauth2/authorization/google`.
@@ -264,4 +270,4 @@ Khi lỗi, `result` bị bỏ qua. `code` tương ứng với `ErrorCode` enum t
 
 - **RDBMS:** PostgreSQL
 - **DDL:** `hibernate.ddl-auto=update` — Hibernate tự tạo/cập nhật schema khi khởi động.
-- **Bảng chính:** `users`, `roles`, `invalidated_token`
+- **Bảng chính:** `users`, `roles`. (`refresh_tokens` và `invalidated_token` là entity legacy, **không** được luồng auth hiện tại sử dụng — refresh token + blacklist đều nằm trong Redis.)
