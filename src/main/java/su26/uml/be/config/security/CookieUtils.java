@@ -30,6 +30,10 @@ public class CookieUtils {
     @Value("${app.auth.cookie.refresh-token-name:refresh_token}")
     String refreshCookieName;
 
+    @NonFinal
+    @Value("${app.auth.cookie.access-token-name:access_token}")
+    String accessCookieName;
+
     /** Bật cho production (HTTPS). Trên http://localhost để false. */
     @NonFinal
     @Value("${app.auth.cookie.secure:false}")
@@ -48,21 +52,43 @@ public class CookieUtils {
     @Value("${jwt.refreshTokenExpiration:604800}")
     long refreshTokenExpiration;
 
+    @NonFinal
+    @Value("${jwt.accessTokenExpiration:3600}")
+    long accessTokenExpiration;
+
     /** Đặt refresh token vào cookie HttpOnly trên response. */
     public void addRefreshTokenCookie(HttpServletResponse response, String token) {
-        ResponseCookie cookie = ResponseCookie.from(refreshCookieName, token)
+        addCookie(response, refreshCookieName, token, refreshTokenExpiration);
+    }
+
+    /** Đặt access token vào cookie HttpOnly trên response. */
+    public void addAccessTokenCookie(HttpServletResponse response, String token) {
+        addCookie(response, accessCookieName, token, accessTokenExpiration);
+    }
+
+    private void addCookie(HttpServletResponse response, String name, String value, long maxAge) {
+        ResponseCookie cookie = ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(secure)
                 .sameSite(sameSite)
                 .path(path)
-                .maxAge(refreshTokenExpiration)
+                .maxAge(maxAge)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     /** Xoá refresh-token cookie (khi logout). */
     public void clearRefreshTokenCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(refreshCookieName, "")
+        clearCookie(response, refreshCookieName);
+    }
+
+    /** Xoá access-token cookie. */
+    public void clearAccessTokenCookie(HttpServletResponse response) {
+        clearCookie(response, accessCookieName);
+    }
+
+    private void clearCookie(HttpServletResponse response, String name) {
+        ResponseCookie cookie = ResponseCookie.from(name, "")
                 .httpOnly(true)
                 .secure(secure)
                 .sameSite(sameSite)
@@ -74,11 +100,20 @@ public class CookieUtils {
 
     /** Đọc refresh token từ cookie của request (nếu có). */
     public Optional<String> extractRefreshToken(HttpServletRequest request) {
+        return extractCookie(request, refreshCookieName);
+    }
+
+    /** Đọc access token từ cookie của request (nếu có). */
+    public Optional<String> extractAccessToken(HttpServletRequest request) {
+        return extractCookie(request, accessCookieName);
+    }
+
+    private Optional<String> extractCookie(HttpServletRequest request, String name) {
         if (request.getCookies() == null) {
             return Optional.empty();
         }
         for (Cookie cookie : request.getCookies()) {
-            if (refreshCookieName.equals(cookie.getName())) {
+            if (name.equals(cookie.getName())) {
                 String value = cookie.getValue();
                 if (value != null && !value.isBlank()) {
                     return Optional.of(value);

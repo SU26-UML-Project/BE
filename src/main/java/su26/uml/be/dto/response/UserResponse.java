@@ -1,15 +1,14 @@
 package su26.uml.be.dto.response;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.FieldDefaults;
-
-import java.time.LocalDateTime;
-
-import java.util.UUID;
 
 @Data
 @AllArgsConstructor
@@ -18,7 +17,7 @@ import java.util.UUID;
 @Schema(name = "UserResponse", description = "User account details.")
 public class UserResponse {
     @Schema(description = "Unique user identifier.", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
-    UUID userID;
+    UUID id;
 
     @Schema(description = "Account username.", example = "johndoe")
     String username;
@@ -56,7 +55,7 @@ public class UserResponse {
     @Schema(name = "RoleResponse", description = "Role assigned to a user.")
     public static class RoleResponse {
         @Schema(description = "Unique role identifier.", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
-        UUID roleID;
+        UUID id;
 
         @Schema(description = "Role name.", example = "USER")
         String roleName;

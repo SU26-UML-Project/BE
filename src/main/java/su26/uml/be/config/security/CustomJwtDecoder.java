@@ -14,6 +14,7 @@ import su26.uml.be.service.AuthenticationService;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Objects;
 
+/*
 @Component
 public class CustomJwtDecoder implements JwtDecoder {
     @Value("${jwt.signerKey}")
@@ -49,3 +50,4 @@ public class CustomJwtDecoder implements JwtDecoder {
         return nimbusJwtDecoder.decode(token);
     }
 }
+*/

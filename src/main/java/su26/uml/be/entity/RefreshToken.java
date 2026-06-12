@@ -19,29 +19,26 @@ import java.util.UUID;
  * mỗi lần refresh sẽ rotate trong cùng family. Nếu một token đã dùng/đã thu hồi
  * bị dùng lại ⇒ dấu hiệu bị đánh cắp ⇒ thu hồi toàn bộ family.</p>
  */
-@Entity
-@Table(name = "refresh_tokens", indexes = {
-        @Index(name = "idx_refresh_token_hash", columnList = "token_hash"),
-        @Index(name = "idx_refresh_token_family", columnList = "family_id")
-})
-@Data
+/*
+@Getter
+@Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@Entity
+@Table(name = "refresh_tokens", indexes = {
+    @Index(name = "idx_rt_token_hash", columnList = "token_hash"),
+    @Index(name = "idx_rt_family_id", columnList = "family_id")
+})
 public class RefreshToken {
-
     @Id
-    @GeneratedValue
-    @UuidGenerator
-    @Column(name = "id", updatable = false, nullable = false)
-    UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Long id;
 
-    /** SHA-256 (hex, 64 ký tự) của token gốc. Không bao giờ lưu token gốc. */
-    @Column(name = "token_hash", nullable = false, unique = true, length = 64)
+    @Column(name = "token_hash", nullable = false, unique = true)
     String tokenHash;
 
-    /** Định danh "dòng họ" token — dùng để thu hồi toàn bộ khi phát hiện reuse. */
     @Column(name = "family_id", nullable = false)
     UUID familyId;
 
@@ -51,15 +48,10 @@ public class RefreshToken {
     @Column(name = "expiry_time", nullable = false)
     Instant expiryTime;
 
-    /** true sau khi token này đã được rotate (đổi lấy token mới). */
-    @Column(name = "used", nullable = false)
+    @Column(nullable = false)
     boolean used;
 
-    /** true khi family bị thu hồi (logout hoặc phát hiện reuse). */
-    @Column(name = "revoked", nullable = false)
+    @Column(nullable = false)
     boolean revoked;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    LocalDateTime createdAt;
 }
+*/

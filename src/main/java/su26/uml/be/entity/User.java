@@ -3,8 +3,6 @@ package su26.uml.be.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
@@ -17,12 +15,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class User {
-    @Id
-    @GeneratedValue
-    @UuidGenerator
-    @Column(name = "user_id", updatable = false, nullable = false)
-    UUID userID;
+public class User extends BaseEntity {
 
     @Column(name = "user_name", nullable = false, unique = true)
     String username;
@@ -62,14 +55,6 @@ public class User {
 
     @Column(name = "last_password_change_at")
     LocalDateTime lastPasswordChangeAt;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    LocalDateTime updatedAt;
 
 //    // ── NEW: AWS Cognito user identifier ─────────────────────────────────────
 //    // Populated by CognitoUserSyncFilter on the first authenticated request.

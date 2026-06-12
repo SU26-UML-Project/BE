@@ -70,8 +70,8 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
             clearAuthenticationAttributes(request);
 
-            // Đặt refresh token vào cookie HttpOnly — KHÔNG nhét token lên URL nữa.
-            // FE sau khi nhận redirect sẽ gọi /auth/refresh để lấy access token (trả trong body).
+            // Đặt cả access token và refresh token vào cookie HttpOnly
+            cookieUtils.addAccessTokenCookie(response, authResponse.getToken());
             cookieUtils.addRefreshTokenCookie(response, authResponse.getRefreshToken());
 
             String redirectUrl = frontendCallbackUrl + "?login=success";

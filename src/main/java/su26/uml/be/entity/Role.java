@@ -16,12 +16,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class Role {
-    @Id
-    @GeneratedValue
-    @UuidGenerator
-    @Column(name = "role_id")
-    UUID roleID;
+public class Role extends BaseEntity {
 
     @Column(name = "role_name", nullable = false, unique = true)
     String roleName;

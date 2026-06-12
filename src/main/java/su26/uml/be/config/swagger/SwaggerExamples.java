@@ -5,7 +5,7 @@ public final class SwaggerExamples {
 
     // ─── Auth ───────────────────────────────────────────
     public static final String LOGIN_REQUEST =
-            "{\"username\": \"johndoe\", \"password\": \"Passw0rd\"}";
+            "{\"email\": \"johndoe@example.com\", \"password\": \"Passw0rd\"}";
 
     public static final String LOGIN_RESPONSE =
             "{\"code\":200,\"result\":{\"token\":\"eyJhbGciOiJIUzUxMiJ9...\",\"authenticated\":true,\"refreshToken\":\"eyJhbGciOiJIUzUxMiJ9...\"}}";
@@ -47,14 +47,14 @@ public final class SwaggerExamples {
               "code": 200,
               "message": "Đăng ký thành công",
               "result": {
-                "userID": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
                 "username": "johndoe",
                 "fullName": "John Doe",
                 "email": "john.doe@gmail.com",
                 "phone": "0901234567",
                 "status": "ACTIVE",
                 "role": {
-                  "roleID": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
                   "roleName": "USER",
                   "description": "Standard application user"
                 }

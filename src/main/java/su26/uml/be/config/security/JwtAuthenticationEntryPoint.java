@@ -13,6 +13,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 
+/*
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
@@ -58,3 +59,4 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         return false;
     }
 }
+*/

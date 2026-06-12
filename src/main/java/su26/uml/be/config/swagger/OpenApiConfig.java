@@ -24,6 +24,7 @@ import java.util.List;
 public class OpenApiConfig {
 
     public static final String BEARER_SCHEME = "bearerAuth";
+    public static final String COOKIE_SCHEME = "cookieAuth";
 
     @Value("${server.port:8088}")
     private String serverPort;
@@ -46,12 +47,21 @@ public class OpenApiConfig {
                         Paste the JWT returned by `POST /auth/login` (the `result.token` field).
                         Swagger sends it as the `Authorization: Bearer <token>` header on protected endpoints.""");
 
+        final SecurityScheme cookieScheme = new SecurityScheme()
+                .name(COOKIE_SCHEME)
+                .type(SecurityScheme.Type.APIKEY)
+                .in(SecurityScheme.In.COOKIE)
+                .name("access_token")
+                .description("JWT via access_token cookie");
+
         return new OpenAPI()
                 .info(apiInfo())
                 .servers(List.of(localServer))
                 .components(new Components()
-                        .addSecuritySchemes(BEARER_SCHEME, bearerScheme))
-                .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME));
+                        .addSecuritySchemes(BEARER_SCHEME, bearerScheme)
+                        .addSecuritySchemes(COOKIE_SCHEME, cookieScheme))
+                .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME))
+                .addSecurityItem(new SecurityRequirement().addList(COOKIE_SCHEME));
     }
 
 

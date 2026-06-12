@@ -1,8 +1,19 @@
 package su26.uml.be.controller;
 
+import java.text.ParseException;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.nimbusds.jose.JOSEException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -11,22 +22,18 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import su26.uml.be.config.swagger.SwaggerExamples;
 import su26.uml.be.dto.request.IntrospectRequest;
 import su26.uml.be.dto.request.LoginRequest;
 import su26.uml.be.dto.request.LogoutRequest;
 import su26.uml.be.dto.response.AuthenticationResponse;
 import su26.uml.be.dto.response.IntrospectResponse;
 import su26.uml.be.service.AuthenticationService;
-import su26.uml.be.config.swagger.SwaggerExamples;
-
-import java.text.ParseException;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
@@ -39,7 +46,7 @@ public class AuthenticationController {
     @PostMapping("/login")
     @Operation(
             summary = "Authenticate and obtain a JWT",
-            description = "Validates username/password and returns a signed HS512 JWT (valid for 1 hour)."
+            description = "Validates email/password and returns a signed HS512 JWT (valid for 1 hour)."
     )
     @SecurityRequirements({})
     @io.swagger.v3.oas.annotations.parameters.RequestBody(

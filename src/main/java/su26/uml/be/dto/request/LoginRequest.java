@@ -12,9 +12,9 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Schema(name = "LoginRequest", description = "Credentials used to obtain a JWT.")
 public class LoginRequest {
-    @NotBlank(message = "USERNAME_REQUIRED")
-    @Schema(description = "Account username.", example = "johndoe", requiredMode = Schema.RequiredMode.REQUIRED)
-    String username;
+    @NotBlank(message = "EMAIL_REQUIRED")
+    @Schema(description = "Account email.", example = "johndoe@example.com", requiredMode = Schema.RequiredMode.REQUIRED)
+    String email;
 
     @NotBlank(message = "PASSWORD_REQUIRED")
     @Schema(description = "Account password.", example = "Passw0rd", requiredMode = Schema.RequiredMode.REQUIRED)

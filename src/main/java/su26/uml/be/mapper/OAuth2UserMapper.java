@@ -7,7 +7,7 @@ import su26.uml.be.entity.User;
 @Mapper(componentModel = "spring")
 public interface OAuth2UserMapper {
 
-//    @Mapping(target = "userID", ignore = true)
+//    @Mapping(target = "id", ignore = true)
 //    @Mapping(target = "password", ignore = true)
 //    @Mapping(target = "phone", ignore = true)
 //    @Mapping(target = "lastActiveAt", ignore = true)
@@ -18,7 +18,7 @@ public interface OAuth2UserMapper {
     User toUser(OAuth2UserInfo info);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-//    @Mapping(target = "userID", ignore = true)
+//    @Mapping(target = "id", ignore = true)
 //    @Mapping(target = "username", ignore = true)
 //    @Mapping(target = "password", ignore = true)
 //    @Mapping(target = "fullName", ignore = true)
