@@ -1,4 +1,4 @@
-package su26.uml.be.config.security;
+package su26.uml.be.service.Impl;
 
 import java.text.ParseException;
 import java.time.Instant;
@@ -21,17 +21,21 @@ import com.nimbusds.jwt.SignedJWT;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import su26.uml.be.entity.User;
+import su26.uml.be.security.JwtProperties;
+import su26.uml.be.service.JwtService;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class JwtService {
+public class JwtServiceImpl implements JwtService {
     private final JwtProperties jwtProperties;
 
+    @Override
     public String generateAccessToken(User user) {
         return generateToken(user, jwtProperties.accessTokenExpiration(), "access", null);
     }
 
+    @Override
     public String generateRefreshToken(User user, String jti) {
         return generateToken(user, jwtProperties.refreshTokenExpiration(), "refresh", jti);
     }
@@ -74,6 +78,7 @@ public class JwtService {
         }
     }
 
+    @Override
     public JWTClaimsSet parseClaims(String token) throws JOSEException, ParseException {
         SignedJWT signedJWT = SignedJWT.parse(token);
         JWSVerifier verifier = new MACVerifier(jwtProperties.signerKey().getBytes());

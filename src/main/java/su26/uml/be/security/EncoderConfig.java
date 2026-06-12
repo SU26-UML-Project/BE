@@ -1,4 +1,4 @@
-package su26.uml.be.config.security;
+﻿package su26.uml.be.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

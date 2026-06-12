@@ -44,23 +44,21 @@ BE/
     │   ├── RedisConfig.java                 — RedisTemplate<String,String> bean
     │   ├── TimezoneVerificationConfig.java  — Timezone setup on startup
     │   ├── TokenCleanupTask.java            — @Deprecated/DISABLED (commented out); refresh tokens now expire via Redis TTL
-    │   ├── security/
-    │   │   ├── CookieUtils.java             — HttpOnly access + refresh cookie: set / clear / extract
-    │   │   ├── JwtService.java              — generate (HS512) + parseClaims (verify signature + expiry) via Nimbus
-    │   │   ├── JwtProperties.java           — @ConfigurationProperties(jwt.*): signerKey, accessTokenExpiration, refreshTokenExpiration
-    │   │   ├── JwtAuthenticationFilter.java — OncePerRequestFilter: verify token per request → set SecurityContext (THE active auth mechanism)
-    │   │   ├── RefreshTokenRedis.java       — REFRESH token JTI tracking in Redis: rt:{jti}→userId, user_rt:{userId} set, logout_time:{email}
-    │   │   ├── UserDetailService.java       — UserDetailsService: load user by email
+    │   ├── security/                        — ONLY legacy DISABLED files remain here (kept untouched for rollback)
     │   │   ├── CustomJwtDecoder.java        — @Deprecated/DISABLED (commented out); old OAuth2 Resource Server JwtDecoder
-    │   │   ├── CustomOAuth2User.java        — OAuth2User wrapper carrying email, name, picture
-    │   │   ├── EncoderConfig.java           — BCryptPasswordEncoder bean (strength=10)
-    │   │   ├── JwtAuthenticationEntryPoint.java — @Deprecated/DISABLED (commented out); 401 now routed via handlerExceptionResolver
-    │   │   ├── OAuth2AuthenticationFailureHandler.java — redirect FE with ?error=...
-    │   │   ├── OAuth2AuthenticationSuccessHandler.java — issue JWT, set refresh cookie, redirect FE
-    │   │   └── SecurityConfig.java          — SecurityFilterChain, CORS, oauth2Login, PUBLIC_ENDPOINTS, jwtAuthenticationFilter
+    │   │   └── JwtAuthenticationEntryPoint.java — @Deprecated/DISABLED (commented out); 401 now routed via handlerExceptionResolver
     │   └── swagger/
     │       ├── OpenApiConfig.java           — OpenAPI bean, global error responses, bearer scheme
     │       └── SwaggerExamples.java         — All Swagger @ExampleObject strings (constants only)
+    ├── security/                            — Auth CONFIG/filter/handlers only (top-level package, moved out of config/security). Token & user-detail logic lives in service/ now.
+    │   ├── SecurityConfig.java              — SecurityFilterChain, CORS, oauth2Login, PUBLIC_ENDPOINTS, jwtAuthenticationFilter
+    │   ├── EncoderConfig.java               — BCryptPasswordEncoder bean (strength=10)
+    │   ├── JwtProperties.java               — @ConfigurationProperties(jwt.*): signerKey, accessTokenExpiration, refreshTokenExpiration
+    │   ├── JwtAuthenticationFilter.java     — OncePerRequestFilter: verify token per request → set SecurityContext (THE active auth mechanism)
+    │   ├── CookieUtils.java                 — HttpOnly access + refresh cookie: set / clear / extract
+    │   ├── CustomOAuth2User.java            — OAuth2User wrapper carrying email, name, picture
+    │   ├── OAuth2AuthenticationFailureHandler.java — redirect FE with ?error=...
+    │   └── OAuth2AuthenticationSuccessHandler.java — issue JWT, set refresh cookie, redirect FE
     ├── controller/
     │   ├── AuthenticationController.java    — POST /auth/{login,refresh,introspect,logout}, GET /auth/account-status
     │   └── UserController.java              — POST /users/register
@@ -96,11 +94,16 @@ BE/
     └── service/
         ├── AuthenticationService.java       — Interface
         ├── TokenBlacklistService.java       — Interface: Redis-backed ACCESS token blacklist
+        ├── JwtService.java                  — Interface: generate (HS512) + parseClaims (verify signature + expiry)
+        ├── RefreshTokenService.java         — Interface: REFRESH token JTI tracking in Redis (rt:{jti}, user_rt:{userId}, logout_time:{email})
         ├── UserService.java                 — Interface
         ├── CustomOAuth2UserService.java     — Interface: Google profile → find/create User
         └── Impl/
             ├── AuthenticationServiceImpl.java
             ├── TokenBlacklistServiceImpl.java
+            ├── JwtServiceImpl.java          — Nimbus JOSE implementation of JwtService
+            ├── RefreshTokenServiceImpl.java — Redis (StringRedisTemplate) implementation of RefreshTokenService
+            ├── UserDetailsServiceImpl.java  — Spring UserDetailsService: load user by email (no custom interface)
             ├── CustomOAuth2UserServiceImpl.java
             └── UserServiceImpl.java
 ```
@@ -174,7 +177,7 @@ public interface UserMapper { ... }
 
 ## 4. Authentication Flow
 
-> **Architecture:** Tokens are verified by a hand-written `JwtAuthenticationFilter` + `JwtService`, **NOT** by Spring's OAuth2 Resource Server. `CustomJwtDecoder`, `JwtAuthenticationEntryPoint`, the `refresh_tokens` table, `RefreshTokenRepository`, and `TokenCleanupTask` are all commented out / unused. Refresh-token state lives in **Redis**, not the DB.
+> **Architecture:** Tokens are verified by a hand-written `JwtAuthenticationFilter` + `JwtService`, **NOT** by Spring's OAuth2 Resource Server. Auth **config/filter/handlers** live in the top-level package **`su26.uml.be.security`** (moved out of `config/security`); the **token & user-detail logic** follows the project's interface+Impl convention in **`service/`** (`JwtService`, `RefreshTokenService`) + **`service/Impl/`** (`JwtServiceImpl`, `RefreshTokenServiceImpl`, `UserDetailsServiceImpl`). The DISABLED legacy files `CustomJwtDecoder` and `JwtAuthenticationEntryPoint` remain in `config/security` untouched. `CustomJwtDecoder`, `JwtAuthenticationEntryPoint`, the `refresh_tokens` table, `RefreshTokenRepository`, and `TokenCleanupTask` are all commented out / unused. Refresh-token state lives in **Redis**, not the DB.
 
 ### ACCESS token structure (HS512, signed with `jwt.signerKey`)
 
@@ -198,7 +201,7 @@ There is **no SHA-256 hash, no DB row, and no token family** — rotation works 
 2. BCrypt password check → `INVALID_CREDENTIALS` if wrong.
 3. Status check: `"LOCKED"` → `USER_INACTIVE`.
 4. Update `user.lastActiveAt`, save.
-5. Generate ACCESS token + REFRESH token (new random `jti`); store `jti` in Redis (`RefreshTokenRedis.store`).
+5. Generate ACCESS token + REFRESH token (new random `jti`); store `jti` in Redis (`RefreshTokenService.store`).
 6. Set both access + refresh tokens as HttpOnly cookies via `CookieUtils`.
 7. Return `{token, authenticated: true}` — no `refreshToken` in body.
 
@@ -224,7 +227,7 @@ There is **no SHA-256 hash, no DB row, and no token family** — rotation works 
 - Returns `{valid: true|false}` — never throws to the caller.
 
 ### Logout — `POST /auth/logout` (public)
-1. Read refresh JWT from cookie → `parseClaims` → `RefreshTokenRedis.revoke(jti)` + `setLogoutTime(email)`.
+1. Read refresh JWT from cookie → `parseClaims` → `RefreshTokenService.revoke(jti)` + `setLogoutTime(email)`.
 2. Clear both access + refresh cookies via `CookieUtils`.
 3. If an access token is provided in the body (`LogoutRequest`): blacklist its `jti` in Redis.
 
@@ -236,8 +239,8 @@ Request → JwtAuthenticationFilter (addFilterBefore UsernamePasswordAuthenticat
        → JwtService.parseClaims()           ← verify signature + expiry
        → require claim typ == "access"
        → TokenBlacklistService.isBlacklisted(jti)         ← Redis check (clears cookies if hit)
-       → RefreshTokenRedis.getLogoutTime(email) vs iat    ← revoked-by-logout check
-       → UserDetailService.loadUserByUsername(email) → set SecurityContext (if user enabled)
+       → RefreshTokenService.getLogoutTime(email) vs iat  ← revoked-by-logout check
+       → UserDetailsServiceImpl.loadUserByUsername(email) → set SecurityContext (if user enabled)
        → @EnableMethodSecurity enforces @PreAuthorize at method level
    On parse error: clear cookies + handlerExceptionResolver.resolveException(...)
 ```
@@ -405,7 +408,7 @@ http://localhost:8088/api/uml/login/oauth2/code/google
 
 12. **Constructor injection via `@RequiredArgsConstructor`** is the convention for service and controller classes. Do not add field-level `@Autowired` to these classes.
 
-13. **Refresh token is a signed JWT (`typ="refresh"`), tracked by `jti` in Redis** (`RefreshTokenRedis`, key `rt:{jti}`). There is no DB row, SHA-256 hash, or token family. The `refresh_tokens` table / `RefreshToken` entity / `RefreshTokenRepository` are unused legacy. Never log or return the raw refresh token except as the HttpOnly cookie value.
+13. **Refresh token is a signed JWT (`typ="refresh"`), tracked by `jti` in Redis** (`RefreshTokenService` / `RefreshTokenServiceImpl`, key `rt:{jti}`). There is no DB row, SHA-256 hash, or token family. The `refresh_tokens` table / `RefreshToken` entity / `RefreshTokenRepository` are unused legacy. Never log or return the raw refresh token except as the HttpOnly cookie value.
 
 14. **`password` and `phone` are nullable on `User`.** Always null-check before using them. Google OAuth2 users will not have either field set.
 

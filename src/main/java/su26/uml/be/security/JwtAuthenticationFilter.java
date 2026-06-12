@@ -1,4 +1,4 @@
-package su26.uml.be.config.security;
+﻿package su26.uml.be.security;
 
 import java.io.IOException;
 
@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -19,6 +20,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import su26.uml.be.service.JwtService;
+import su26.uml.be.service.RefreshTokenService;
 import su26.uml.be.service.TokenBlacklistService;
 
 @Component
@@ -26,8 +29,8 @@ import su26.uml.be.service.TokenBlacklistService;
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
-    private final UserDetailService userDetailsService;
-    private final RefreshTokenRedis refreshTokenRedis;
+    private final UserDetailsService userDetailsService;
+    private final RefreshTokenService refreshTokenRedis;
     private final CookieUtils cookieUtils;
     private final TokenBlacklistService tokenBlacklistService;
 

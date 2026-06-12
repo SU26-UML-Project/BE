@@ -1,4 +1,4 @@
-package su26.uml.be.config.security;
+package su26.uml.be.service.Impl;
 
 import java.util.Collections;
 import java.util.List;
@@ -15,7 +15,7 @@ import su26.uml.be.repository.UserRepository;
 
 @Service
 @RequiredArgsConstructor
-public class UserDetailService implements UserDetailsService {
+public class UserDetailsServiceImpl implements UserDetailsService {
     private final UserRepository userRepository;
 
     @Override

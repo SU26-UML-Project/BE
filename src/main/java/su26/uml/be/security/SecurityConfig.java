@@ -1,4 +1,4 @@
-package su26.uml.be.config.security;
+﻿package su26.uml.be.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -54,7 +55,7 @@ public class SecurityConfig {
     };
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final UserDetailService userDetailService;
+    private final UserDetailsService userDetailService;
     private final HandlerExceptionResolver handlerExceptionResolver;
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
@@ -78,7 +79,7 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-        // Giữ lại OAuth2 Login nếu dự án cần
+        // Giá»¯ láº¡i OAuth2 Login náº¿u dá»± Ã¡n cáº§n
         httpSecurity.oauth2Login(oauth2 ->
                 oauth2.userInfoEndpoint(userInfo ->
                                 userInfo.userService(customOAuth2UserService))

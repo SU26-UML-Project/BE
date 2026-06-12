@@ -1,4 +1,4 @@
-package su26.uml.be.service.Impl;
+﻿package su26.uml.be.service.Impl;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -11,10 +11,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import su26.uml.be.config.security.CookieUtils;
-import su26.uml.be.config.security.JwtProperties;
-import su26.uml.be.config.security.JwtService;
-import su26.uml.be.config.security.RefreshTokenRedis;
+import su26.uml.be.security.CookieUtils;
+import su26.uml.be.security.JwtProperties;
+import su26.uml.be.service.JwtService;
+import su26.uml.be.service.RefreshTokenService;
 import su26.uml.be.dto.request.IntrospectRequest;
 import su26.uml.be.dto.request.LoginRequest;
 import su26.uml.be.dto.request.LogoutRequest;
@@ -41,7 +41,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     UserRepository userRepository;
     PasswordEncoder passwordEncoder;
     TokenBlacklistService tokenBlacklistService;
-    RefreshTokenRedis refreshTokenRedis;
+    RefreshTokenService refreshTokenRedis;
     JwtService jwtService;
     JwtProperties jwtProperties;
     CookieUtils cookieUtils;
@@ -64,7 +64,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     .valid(isValid)
                     .build();
         } catch (Exception e) {
-            log.error("Lỗi khi xác thực token", e);
+            log.error("Lá»—i khi xÃ¡c thá»±c token", e);
             return IntrospectResponse.builder().valid(false).build();
         }
     }
@@ -73,7 +73,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional
     public void logout(LogoutRequest request, HttpServletRequest httpRequest, HttpServletResponse response)
             throws ParseException, JOSEException {
-        // Thu hồi refresh token trong Redis + xoá cookie.
+        // Thu há»“i refresh token trong Redis + xoÃ¡ cookie.
         cookieUtils.extractRefreshToken(httpRequest)
                 .ifPresent(token -> {
                     try {
@@ -90,7 +90,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         cookieUtils.clearRefreshTokenCookie(response);
         cookieUtils.clearAccessTokenCookie(response);
 
-        // Nếu FE còn gửi kèm access token thì blacklist luôn.
+        // Náº¿u FE cÃ²n gá»­i kÃ¨m access token thÃ¬ blacklist luÃ´n.
         if (request != null && request.getToken() != null && !request.getToken().isBlank()) {
             try {
                 var claims = jwtService.parseClaims(request.getToken());

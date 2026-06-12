@@ -1,8 +1,10 @@
-package su26.uml.be.config.security;
+package su26.uml.be.service.Impl;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+
+import su26.uml.be.service.RefreshTokenService;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -12,12 +14,13 @@ import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
-public class RefreshTokenRedis {
+public class RefreshTokenServiceImpl implements RefreshTokenService {
     private static final String PREFIX = "rt:";
     private static final String USER_INDEX_PREFIX = "user_rt:";
     private static final String LOGOUT_TIME_PREFIX = "logout_time:";
     private final StringRedisTemplate redis;
 
+    @Override
     public void store(String jti, String userId, Duration ttl) {
         redis.opsForValue().set(PREFIX + jti, userId, ttl);
 
@@ -26,10 +29,12 @@ public class RefreshTokenRedis {
         redis.expire(indexKey, ttl);
     }
 
+    @Override
     public Optional<String> getUserIdByJti(String jti) {
         return Optional.ofNullable(redis.opsForValue().get(PREFIX + jti));
     }
 
+    @Override
     public void revoke(String jti) {
         String userId = redis.opsForValue().get(PREFIX + jti);
         if (userId != null) {
@@ -38,6 +43,7 @@ public class RefreshTokenRedis {
         }
     }
 
+    @Override
     public void revokeAllTokens(String userId) {
         String indexKey = USER_INDEX_PREFIX + userId;
         Set<String> jtis = redis.opsForSet().members(indexKey);
@@ -53,11 +59,13 @@ public class RefreshTokenRedis {
     }
 
     // Cắm mốc thời gian lúc đổi pass/logout-all
+    @Override
     public void setLogoutTime(String email) {
         redis.opsForValue().set(LOGOUT_TIME_PREFIX + email, String.valueOf(System.currentTimeMillis()));
     }
 
     // Lấy mốc thời gian để so sánh
+    @Override
     public Long getLogoutTime(String email) {
         String val = redis.opsForValue().get(LOGOUT_TIME_PREFIX + email);
         return val != null ? Long.parseLong(val) : null;

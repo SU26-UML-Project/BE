@@ -36,23 +36,21 @@ BE/
 │   │   ├── RedisConfig.java
 │   │   ├── TimezoneVerificationConfig.java
 │   │   ├── TokenCleanupTask.java
-│   │   ├── security/
-│   │   │   ├── CookieUtils.java
-│   │   │   ├── JwtService.java                 ← sinh + verify token (HS512)
-│   │   │   ├── JwtProperties.java              ← cấu hình jwt.*
-│   │   │   ├── JwtAuthenticationFilter.java    ← filter xác thực mỗi request
-│   │   │   ├── RefreshTokenRedis.java          ← theo dõi refresh token trong Redis
-│   │   │   ├── UserDetailService.java
+│   │   ├── security/                          ← CHỈ còn file legacy DISABLED (giữ để rollback)
 │   │   │   ├── CustomJwtDecoder.java           ← DISABLED (comment)
-│   │   │   ├── CustomOAuth2User.java
-│   │   │   ├── EncoderConfig.java
-│   │   │   ├── JwtAuthenticationEntryPoint.java ← DISABLED (comment)
-│   │   │   ├── OAuth2AuthenticationFailureHandler.java
-│   │   │   ├── OAuth2AuthenticationSuccessHandler.java
-│   │   │   └── SecurityConfig.java
+│   │   │   └── JwtAuthenticationEntryPoint.java ← DISABLED (comment)
 │   │   └── swagger/
 │   │       ├── OpenApiConfig.java
 │   │       └── SwaggerExamples.java
+│   ├── security/                              ← Auth config/filter/handlers (package cấp cao). Logic token/user-detail nằm ở service/
+│   │   ├── SecurityConfig.java
+│   │   ├── EncoderConfig.java
+│   │   ├── JwtProperties.java                  ← cấu hình jwt.*
+│   │   ├── JwtAuthenticationFilter.java        ← filter xác thực mỗi request
+│   │   ├── CookieUtils.java
+│   │   ├── CustomOAuth2User.java
+│   │   ├── OAuth2AuthenticationFailureHandler.java
+│   │   └── OAuth2AuthenticationSuccessHandler.java
 │   ├── controller/
 │   │   ├── AuthenticationController.java
 │   │   └── UserController.java
@@ -71,12 +69,14 @@ BE/
 │   ├── mapper/
 │   │   └── UserMapper.java
 │   ├── repository/
-│   └── service/
+│   └── service/                              ← interface + Impl/ (gồm cả JwtService, RefreshTokenService)
 │       ├── AuthenticationService.java
 │       ├── TokenBlacklistService.java
+│       ├── JwtService.java                    ← sinh + verify token (HS512)
+│       ├── RefreshTokenService.java           ← theo dõi refresh token trong Redis
 │       ├── UserService.java
 │       ├── CustomOAuth2UserService.java
-│       └── Impl/
+│       └── Impl/                              ← JwtServiceImpl, RefreshTokenServiceImpl, UserDetailsServiceImpl, ...
 ├── src/main/resources/
 │   └── application.yaml
 ├── docker-compose.yml

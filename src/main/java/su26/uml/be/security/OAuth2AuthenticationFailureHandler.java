@@ -1,4 +1,4 @@
-package su26.uml.be.config.security;
+﻿package su26.uml.be.security;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,10 +22,10 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
                                         AuthenticationException exception) throws IOException {
-        log.error("OAuth2 đăng nhập thất bại: {}", exception.getMessage());
+        log.error("OAuth2 Ä‘Äƒng nháº­p tháº¥t báº¡i: {}", exception.getMessage());
 
         String errorMsg = URLEncoder.encode(
-                exception.getMessage() != null ? exception.getMessage() : "Đăng nhập Google thất bại",
+                exception.getMessage() != null ? exception.getMessage() : "ÄÄƒng nháº­p Google tháº¥t báº¡i",
                 StandardCharsets.UTF_8
         );
 
