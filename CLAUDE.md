@@ -129,11 +129,8 @@ public class FooServiceImpl implements FooService {
 }
 ```
 
-### Config classes use field-level `@Autowired`
-```java
-@Autowired
-private CustomJwtDecoder customJwtDecoder;
-```
+### Config classes
+`@Configuration` classes use **constructor injection** (`@RequiredArgsConstructor` with `private final` fields, e.g. `SecurityConfig`) or **`@Bean` method-parameter injection** (e.g. `RedisConfig`'s `redisTemplate(RedisConnectionFactory)`). Do not use field-level `@Autowired`.
 
 ### DTO pattern
 All DTOs use `@Data @Builder @AllArgsConstructor @NoArgsConstructor @FieldDefaults(level = AccessLevel.PRIVATE)`.
@@ -259,7 +256,7 @@ Request → JwtAuthenticationFilter (addFilterBefore UsernamePasswordAuthenticat
    On parse error: clear cookies + handlerExceptionResolver.resolveException(...)
 ```
 Unauthenticated / token error → `SecurityConfig` `authenticationEntryPoint` delegates to `handlerExceptionResolver` (→ `GlobalExceptionHandler`).
-> ⚠️ **Known issue:** `GlobalExceptionHandler` has no `AuthenticationException`/`JwtException` handler, so these currently fall through to the catch-all `Exception` handler → **HTTP 500 / code 9999** instead of a clean **401 UNAUTHENTICATED**. The old `JwtAuthenticationEntryPoint` (now disabled) used to produce the 401 JSON. To fully retire it, add an `@ExceptionHandler(AuthenticationException.class)` returning `ErrorCode.UNAUTHENTICATED`.
+> ✅ **Resolved:** `GlobalExceptionHandler` now defines `@ExceptionHandler(AuthenticationException.class)` → `ErrorCode.UNAUTHENTICATED` (401) and `@ExceptionHandler(AccessDeniedException.class)` → `ErrorCode.UNAUTHORIZED` (403), so authentication/authorization failures return clean JSON envelopes. The disabled `JwtAuthenticationEntryPoint` is fully superseded. Edge case: a raw `JwtException` not wrapped in an `AuthenticationException` still hits the catch-all 500 — keep token-parse failures wrapped.
 
 ### Scheduled cleanup
 - `TokenCleanupTask` is disabled — Redis TTL handles expiry of both `blacklist:{jti}` and `rt:{jti}` keys automatically.
@@ -428,7 +425,7 @@ http://localhost:8088/api/uml/login/oauth2/code/google
 
 15. **ACCESS token blacklist lives in Redis, not the DB.** Use `TokenBlacklistService` — never write to `invalidated_token` table for new code.
 
-16. **Config classes (`SecurityConfig`, `RedisConfig`) use field-level `@Autowired`**, not constructor injection. All other classes use `@RequiredArgsConstructor`.
+16. **Use constructor injection everywhere — no field-level `@Autowired`.** Service/controller classes use `@RequiredArgsConstructor` (+ `@FieldDefaults(makeFinal = true)`); `@Configuration` classes use `@RequiredArgsConstructor` with `private final` fields (`SecurityConfig`) or `@Bean` method-parameter injection (`RedisConfig`).
 
 17. **`authenticate()`, `refreshToken()`, `generateTokenForOAuth2User()` in `AuthenticationServiceImpl` are `@Transactional`** — they update `user.lastActiveAt` and write refresh-token state to Redis. Do not call them from another `@Transactional` context that you want to keep separate.
 
@@ -436,4 +433,4 @@ http://localhost:8088/api/uml/login/oauth2/code/google
 
 19. **Always handle errors via `AppException` + `ErrorCode` — guard inputs and failure paths in every service method.** Validate request DTOs at the boundary with Bean Validation (`@Valid` + `message = "ERROR_CODE_KEY"`); inside the `*Impl`, guard every lookup (`.orElseThrow(() -> new AppException(...))`), uniqueness/pre-condition, and business-state check by throwing `AppException(ErrorCode.X)`. Add a new `ErrorCode` entry (code + message + `HttpStatus`) for any new condition. Never throw raw exceptions to the controller, never hand-build an error `ApiResponse`, and never swallow a caught exception silently.
 
-20. **Auth-failure responses currently return 500/code 9999, not 401.** `GlobalExceptionHandler` lacks an `AuthenticationException`/`JwtException` handler, so the disabled `JwtAuthenticationEntryPoint` is not fully replaced. Add `@ExceptionHandler(AuthenticationException.class)` → `ErrorCode.UNAUTHENTICATED` before relying on clean 401s.
+20. **Auth-failure responses return a clean 401 UNAUTHENTICATED.** `GlobalExceptionHandler` now has `@ExceptionHandler(AuthenticationException.class)` → `ErrorCode.UNAUTHENTICATED` (and an `AccessDeniedException` → `UNAUTHORIZED` handler), fully replacing the disabled `JwtAuthenticationEntryPoint`. A raw `JwtException` thrown outside an `AuthenticationException` still falls through to the catch-all 500, so wrap token-parse failures in an `AuthenticationException` (or `AppException`) where possible.

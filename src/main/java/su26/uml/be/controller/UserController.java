@@ -51,12 +51,22 @@ public class UserController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
+    @Operation(
+            summary = "List all users",
+            description = "Returns every user account. Restricted to ADMIN."
+    )
+    @ApiResponse(responseCode = "200", description = "User list returned.")
     public su26.uml.be.dto.response.ApiResponse<List<UserResponse>> getAllUsers() {
         return userService.getAllUsers();
     }
 
     @GetMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN')")
+    @Operation(
+            summary = "Get a user by id",
+            description = "Looks up a single user by UUID. Restricted to ADMIN."
+    )
+    @ApiResponse(responseCode = "200", description = "User returned.")
     public su26.uml.be.dto.response.ApiResponse<UserResponse> getUserById(@PathVariable UUID userId) {
         return userService.getUserById(userId);
     }
