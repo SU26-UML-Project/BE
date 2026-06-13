@@ -79,7 +79,7 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-        // Giá»¯ láº¡i OAuth2 Login náº¿u dá»± Ã¡n cáº§n
+        // Giữ lại OAuth2 Login nếu dự án cần
         httpSecurity.oauth2Login(oauth2 ->
                 oauth2.userInfoEndpoint(userInfo ->
                                 userInfo.userService(customOAuth2UserService))

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import su26.uml.be.dto.request.UserRegisterRequest;
 import su26.uml.be.dto.response.ApiResponse;
+import su26.uml.be.dto.response.MeResponse;
 import su26.uml.be.dto.response.UserResponse;
 import su26.uml.be.entity.Role;
 import su26.uml.be.entity.User;
@@ -79,5 +80,16 @@ public class UserServiceImpl implements UserService {
         UserResponse userResponse = userMapper.toUserResponse(user);
 //        resolveAvatar(userResponse);
         return ApiResponse.success("Lấy thông tin Người dùng thành công", userResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<MeResponse> getCurrentUser(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        MeResponse meResponse = userMapper.toMeResponse(user);
+
+        return ApiResponse.success("Lấy thông tin người dùng hiện tại thành công", meResponse);
     }
 }

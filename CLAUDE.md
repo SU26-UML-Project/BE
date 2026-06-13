@@ -144,9 +144,16 @@ String username;
 ```
 
 ### Error handling
-1. Service throws `new AppException(ErrorCode.SOME_CODE)`.
-2. `GlobalExceptionHandler.handlingAppException()` catches it and returns `ApiResponse` with `code` and `message` from `ErrorCode`.
-3. Never throw raw exceptions to the controller.
+**Every service/`*Impl` method must guard its inputs and failure paths with explicit exception handling — never let an invalid value, missing entity, or duplicate flow through silently.**
+1. **Validate request DTOs at the boundary.** All request DTOs carry Bean Validation annotations whose `message` is an `ErrorCode` enum key (see DTO pattern), and the controller param is annotated `@Valid`. Add a matching `ErrorCode` entry for every new validation message.
+2. **Guard inside the service before acting:**
+   - Lookups that can miss → `.orElseThrow(() -> new AppException(ErrorCode.X_NOT_EXISTED))` (e.g. `findByEmail`, `findById`).
+   - Uniqueness / pre-conditions → check then `throw new AppException(ErrorCode.X_EXISTED)` (e.g. `existsByUsername`, `existsByEmail`).
+   - Business-state checks (locked account, OTP expired, password mismatch, etc.) → dedicated `ErrorCode`.
+3. Service throws `new AppException(ErrorCode.SOME_CODE)`; if a new condition has no code yet, **add one to the `ErrorCode` enum** (code + message + `HttpStatus`) first.
+4. `GlobalExceptionHandler.handlingAppException()` catches it and returns `ApiResponse` with `code` and `message` from `ErrorCode`.
+5. **Never throw raw exceptions to the controller** and never return an error by hand-building `ApiResponse` — always go through `AppException` + `ErrorCode` so the response envelope and HTTP status stay consistent.
+6. When wrapping risky calls in `try/catch`, log with `@Slf4j` and either rethrow as an `AppException` or fall back deliberately — do not swallow the exception silently.
 
 ### Response envelope
 Every endpoint returns `ApiResponse<T>`:
@@ -172,6 +179,13 @@ return ApiResponse.<Void>builder().build();
 @Mapper(componentModel = "spring")  // always spring component model
 public interface UserMapper { ... }
 ```
+**Always map entity → DTO (and DTO → entity) through a MapStruct mapper method — never hand-build a DTO/entity with its Lombok `.builder()` / setters inside a service.** This applies to **every CRUD operation** (Create, Read, Update, Delete) on every entity, not just reads:
+- **Create:** map the request DTO → entity via the mapper (e.g. `userMapper.toUser(request)`), then set only the fields the mapper can't (password hash, role lookup, status, etc.).
+- **Read:** map entity → response DTO via the mapper (e.g. `toUserResponse`, `toMeResponse`, `toUserResponseList`).
+- **Update:** use a MapStruct `void update(SourceDto dto, @MappingTarget Entity entity)` method (with `@BeanMapping(nullValuePropertyMappingStrategy = IGNORE)` for partial updates) instead of manually calling setters.
+- **Delete:** map the affected entity → response DTO via the mapper when returning the deleted record.
+
+If a target DTO has no mapper method yet, add one to the appropriate mapper (e.g. `UserMapper.toMeResponse(User)`) and call it from the service. Use `@Mapping(target = ..., source = ...)` for fields that differ in name or are nested (e.g. `@Mapping(target = "role", source = "role.roleName")` to flatten a nested entity field to a `String`).
 
 ---
 
@@ -418,4 +432,8 @@ http://localhost:8088/api/uml/login/oauth2/code/google
 
 17. **`authenticate()`, `refreshToken()`, `generateTokenForOAuth2User()` in `AuthenticationServiceImpl` are `@Transactional`** — they update `user.lastActiveAt` and write refresh-token state to Redis. Do not call them from another `@Transactional` context that you want to keep separate.
 
-18. **Auth-failure responses currently return 500/code 9999, not 401.** `GlobalExceptionHandler` lacks an `AuthenticationException`/`JwtException` handler, so the disabled `JwtAuthenticationEntryPoint` is not fully replaced. Add `@ExceptionHandler(AuthenticationException.class)` → `ErrorCode.UNAUTHENTICATED` before relying on clean 401s.
+18. **Use MapStruct for all entity↔DTO conversion across the full CRUD surface — never hand-build DTOs/entities in services.** Applies to Create, Read, Update, and Delete on every entity. Do not construct a response/entity with Lombok `.builder()` or setters inside a service method when a mapper can do it: requests → entity on create, entity → response on read/delete, and a `@MappingTarget` update method on update. Add (or reuse) a method on the relevant MapStruct mapper (`@Mapper(componentModel = "spring")`) and call it. Use `@Mapping` for renamed/nested fields (e.g. `source = "role.roleName"`).
+
+19. **Always handle errors via `AppException` + `ErrorCode` — guard inputs and failure paths in every service method.** Validate request DTOs at the boundary with Bean Validation (`@Valid` + `message = "ERROR_CODE_KEY"`); inside the `*Impl`, guard every lookup (`.orElseThrow(() -> new AppException(...))`), uniqueness/pre-condition, and business-state check by throwing `AppException(ErrorCode.X)`. Add a new `ErrorCode` entry (code + message + `HttpStatus`) for any new condition. Never throw raw exceptions to the controller, never hand-build an error `ApiResponse`, and never swallow a caught exception silently.
+
+20. **Auth-failure responses currently return 500/code 9999, not 401.** `GlobalExceptionHandler` lacks an `AuthenticationException`/`JwtException` handler, so the disabled `JwtAuthenticationEntryPoint` is not fully replaced. Add `@ExceptionHandler(AuthenticationException.class)` → `ErrorCode.UNAUTHENTICATED` before relying on clean 401s.

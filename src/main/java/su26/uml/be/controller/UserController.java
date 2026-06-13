@@ -12,9 +12,12 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import su26.uml.be.config.swagger.SwaggerExamples;
 import su26.uml.be.dto.request.UserRegisterRequest;
+import su26.uml.be.dto.response.MeResponse;
 import su26.uml.be.dto.response.UserResponse;
 import su26.uml.be.service.UserService;
 
@@ -56,5 +59,17 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public su26.uml.be.dto.response.ApiResponse<UserResponse> getUserById(@PathVariable UUID userId) {
         return userService.getUserById(userId);
+    }
+
+    @GetMapping("/me")
+    @Operation(
+            summary = "Get the currently authenticated user",
+            description = "Returns the identity (id, email, role) of the user resolved from the JWT in the " +
+                    "Security Context. Requires a valid access token; the user is never passed as a parameter."
+    )
+    @ApiResponse(responseCode = "200", description = "Current user returned.")
+    public su26.uml.be.dto.response.ApiResponse<MeResponse> getCurrentUser(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return userService.getCurrentUser(userDetails.getUsername());
     }
 }
