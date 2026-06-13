@@ -1,4 +1,4 @@
-﻿package su26.uml.be.service.Impl;
+package su26.uml.be.service.Impl;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

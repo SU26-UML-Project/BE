@@ -1,4 +1,4 @@
-﻿package su26.uml.be.security;
+package su26.uml.be.security;
 
 import java.io.IOException;
 
