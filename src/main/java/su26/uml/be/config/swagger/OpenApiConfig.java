@@ -32,11 +32,18 @@ public class OpenApiConfig {
     @Value("${server.servlet.context-path:/api/uml}")
     private String contextPath;
 
+    @Value("${PRODUCTION_URL:https://diauml-be.onrender.com/api/uml}")
+    private String productionUrl;
+
     @Bean
     public OpenAPI umlOpenAPI() {
         final Server localServer = new Server()
                 .url("http://localhost:" + serverPort + contextPath)
                 .description("Local development server");
+
+        final Server productionServer = new Server()
+                .url(productionUrl)
+                .description("Production server");
 
         final SecurityScheme bearerScheme = new SecurityScheme()
                 .name(BEARER_SCHEME)
@@ -56,7 +63,7 @@ public class OpenApiConfig {
 
         return new OpenAPI()
                 .info(apiInfo())
-                .servers(List.of(localServer))
+                .servers(List.of(localServer, productionServer))
                 .components(new Components()
                         .addSecuritySchemes(BEARER_SCHEME, bearerScheme)
                         .addSecuritySchemes(COOKIE_SCHEME, cookieScheme))
