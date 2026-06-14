@@ -18,12 +18,10 @@ spring:
 
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      url: ${REDIS_URL}
       ssl:
-        enabled: ${REDIS_SSL:true}
-      timeout: ${REDIS_TIMEOUT:2000ms}
+        enabled: true
+      timeout: 2000ms
 
   jpa:
     hibernate:
