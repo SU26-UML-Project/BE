@@ -110,7 +110,8 @@ public class SecurityConfig {
                 "https://localhost:*",
                 "http://127.0.0.1:*",
                 "https://*.ngrok-free.app",
-                "https://*.up.railway.app"
+                "https://*.up.railway.app",
+                "https://*.vercel.app"
         ));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(Arrays.asList("*"));
