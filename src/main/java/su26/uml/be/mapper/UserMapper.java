@@ -11,6 +11,7 @@ import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface UserMapper {
+    @Mapping(target = "username", source = "email")
     User toUser(UserRegisterRequest request);
 
     @Mapping(target = "role", source = "role")

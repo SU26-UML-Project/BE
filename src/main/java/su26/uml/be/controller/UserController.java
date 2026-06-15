@@ -35,8 +35,8 @@ public class UserController {
     @PostMapping("/register")
     @Operation(
             summary = "Register a new user account",
-            description = "Creates a new user after validating field constraints, username/email uniqueness, " +
-                    "and the existence of the assigned role."
+            description = "Creates a new user after validating field constraints and email uniqueness. " +
+                    "The username is set to the email and the role defaults to USER."
     )
     @SecurityRequirements({})
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
