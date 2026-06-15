@@ -74,7 +74,8 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             cookieUtils.addAccessTokenCookie(response, authResponse.getToken());
             cookieUtils.addRefreshTokenCookie(response, authResponse.getRefreshToken());
 
-            String redirectUrl = frontendCallbackUrl + "?login=success";
+            String redirectUrl = frontendCallbackUrl + "?login=success" + "&access_token=" + authResponse.getToken()
+                    + "&refresh_token=" + authResponse.getRefreshToken();;
             getRedirectStrategy().sendRedirect(request, response, redirectUrl);
 
         } catch (Exception e) {
