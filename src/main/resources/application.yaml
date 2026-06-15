@@ -7,14 +7,18 @@ spring:
   application:
     name: ${APP_NAME}
 
-#  config:
-#    import: optional:file:BE/.env[.properties]
+  config:
+    import: optional:file:BE/.env[.properties]
 
   datasource:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 1
+      connection-timeout: 30000
 
   data:
     redis:
