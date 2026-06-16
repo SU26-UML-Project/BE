@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import su26.uml.be.dto.request.UpdateUserRequest;
 import su26.uml.be.dto.request.UserRegisterRequest;
 import su26.uml.be.dto.response.ApiResponse;
 import su26.uml.be.dto.response.MeResponse;
@@ -19,6 +20,7 @@ import su26.uml.be.mapper.UserMapper;
 import su26.uml.be.repository.RoleRepository;
 import su26.uml.be.repository.UserRepository;
 import su26.uml.be.service.UserService;
+
 
 import java.util.List;
 import java.util.UUID;
@@ -57,21 +59,14 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public ApiResponse<UserResponse> registerAdmin(UserRegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail()))
-            throw new AppException(ErrorCode.EMAIL_EXISTED);
+    public ApiResponse<UserResponse> updateMe(String email, UpdateUserRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
-        User user = userMapper.toUser(request);
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-
-        Role role = roleRepository.findByRoleName("ADMIN")
-                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
-        user.setRole(role);
-
-        user.setStatus("ACTIVE");
+        userMapper.updateUser(request, user);
         User savedUser = userRepository.save(user);
 
-        return ApiResponse.success("Tạo tài khoản Admin thành công", userMapper.toUserResponse(savedUser));
+        return ApiResponse.success("Cập nhật thông tin thành công", userMapper.toUserResponse(savedUser));
     }
 
     @Override

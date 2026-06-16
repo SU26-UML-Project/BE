@@ -1,5 +1,6 @@
 package su26.uml.be.dto.response;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -30,6 +31,9 @@ public class UserResponse {
 
     @Schema(description = "Phone number.", example = "0901234567")
     String phone;
+
+    @Schema(description = "Date of birth.", example = "2000-01-15")
+    LocalDate dob;
 
     @Schema(description = "Hashed password (BCrypt).", accessMode = Schema.AccessMode.READ_ONLY)
     String password;

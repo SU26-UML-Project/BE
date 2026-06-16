@@ -68,6 +68,33 @@ public final class SwaggerExamples {
               "phone": "0901234567"
             }""";
 
+    public static final String UPDATE_USER_REQUEST = """
+            {
+              "fullName": "Nguyen Van B",
+              "phone": "0909999999",
+              "dob": "2000-01-15"
+            }""";
+
+    public static final String UPDATE_USER_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Cập nhật thông tin thành công",
+              "result": {
+                "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "username": "john.doe@gmail.com",
+                "fullName": "Nguyen Van B",
+                "email": "john.doe@gmail.com",
+                "phone": "0909999999",
+                "dob": "2000-01-15",
+                "status": "ACTIVE",
+                "role": {
+                  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                  "roleName": "USER",
+                  "description": "Standard application user"
+                }
+              }
+            }""";
+
     public static final String REGISTER_RESPONSE = """
             {
               "code": 200,

@@ -16,6 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import su26.uml.be.config.swagger.SwaggerExamples;
+import su26.uml.be.dto.request.UpdateUserRequest;
 import su26.uml.be.dto.request.UserRegisterRequest;
 import su26.uml.be.dto.response.MeResponse;
 import su26.uml.be.dto.response.UserResponse;
@@ -69,6 +70,24 @@ public class UserController {
     @ApiResponse(responseCode = "200", description = "User returned.")
     public su26.uml.be.dto.response.ApiResponse<UserResponse> getUserById(@PathVariable UUID userId) {
         return userService.getUserById(userId);
+    }
+
+    @PatchMapping("/me")
+    @Operation(
+            summary = "Update the current user's profile",
+            description = "Partially updates fullName, phone, and/or avatarUrl of the authenticated user. " +
+                    "Only provided fields are updated; omitted fields remain unchanged."
+    )
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(schema = @Schema(implementation = UpdateUserRequest.class),
+                    examples = @ExampleObject(value = SwaggerExamples.UPDATE_USER_REQUEST)))
+    @ApiResponse(responseCode = "200", description = "Profile updated successfully.",
+            content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
+                    examples = @ExampleObject(value = SwaggerExamples.UPDATE_USER_RESPONSE)))
+    public su26.uml.be.dto.response.ApiResponse<UserResponse> updateMe(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody UpdateUserRequest request) {
+        return userService.updateMe(userDetails.getUsername(), request);
     }
 
     @GetMapping("/me")

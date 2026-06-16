@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import su26.uml.be.config.swagger.SwaggerExamples;
 import su26.uml.be.dto.request.UserRegisterRequest;
 import su26.uml.be.dto.response.UserResponse;
-import su26.uml.be.service.UserService;
+import su26.uml.be.service.AdminService;
 
 @RestController
 @RequestMapping("/admin")
@@ -27,7 +27,7 @@ import su26.uml.be.service.UserService;
 @Tag(name = "Admin", description = "Admin-only management operations.")
 public class AdminController {
 
-    UserService userService;
+    AdminService adminService;
 
     @PostMapping("/register")
     @PreAuthorize("hasRole('ADMIN')")
@@ -43,6 +43,6 @@ public class AdminController {
                     examples = @ExampleObject(value = SwaggerExamples.ADMIN_REGISTER_RESPONSE)))
     public su26.uml.be.dto.response.ApiResponse<UserResponse> registerAdmin(
             @Valid @RequestBody UserRegisterRequest request) {
-        return userService.registerAdmin(request);
+        return adminService.registerAdmin(request);
     }
 }

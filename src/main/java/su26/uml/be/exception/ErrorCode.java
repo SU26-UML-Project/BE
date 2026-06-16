@@ -34,6 +34,7 @@ public enum ErrorCode {
     USER_NOT_EXISTED(1016, "Người dùng không tồn tại", HttpStatus.NOT_FOUND),
     INVALID_FULLNAME(1017, "Họ tên không được vượt quá 255 ký tự", HttpStatus.BAD_REQUEST),
     USER_LIST_EMPTY(1018, "Không có tài khoản nào trong hệ thống!!!", HttpStatus.NOT_FOUND),
+    INVALID_DOB(1025, "Ngày sinh không hợp lệ, phải là ngày trong quá khứ", HttpStatus.BAD_REQUEST),
 
     // ROLE ERRORS
     ROLE_NOT_FOUND(1019, "Role không tồn tại", HttpStatus.NOT_FOUND),

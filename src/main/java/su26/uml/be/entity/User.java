@@ -5,6 +5,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.UuidGenerator;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -49,6 +50,9 @@ public class User extends BaseEntity {
 
     @Column(name = "avatar_url", length = 500)
     String avatarUrl;
+
+    @Column(name = "dob")
+    LocalDate dob;
 
     @Column(name = "last_active_at")
     LocalDateTime lastActiveAt;
