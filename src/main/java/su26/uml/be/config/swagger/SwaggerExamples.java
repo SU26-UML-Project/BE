@@ -31,6 +31,34 @@ public final class SwaggerExamples {
     public static final String ACCOUNT_STATUS_RESPONSE =
             "{\"code\":0,\"result\":{\"locked\":false}}";
 
+    // ─── Admin ──────────────────────────────────────────
+    public static final String ADMIN_REGISTER_REQUEST = """
+            {
+              "password": "Passw0rd",
+              "fullName": "Admin User",
+              "email": "admin@gmail.com",
+              "phone": "0901234567"
+            }""";
+
+    public static final String ADMIN_REGISTER_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Tạo tài khoản Admin thành công",
+              "result": {
+                "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "username": "admin@gmail.com",
+                "fullName": "Admin User",
+                "email": "admin@gmail.com",
+                "phone": "0901234567",
+                "status": "ACTIVE",
+                "role": {
+                  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                  "roleName": "ADMIN",
+                  "description": "System administrator"
+                }
+              }
+            }""";
+
     // ─── Users ──────────────────────────────────────────
     public static final String REGISTER_REQUEST = """
             {

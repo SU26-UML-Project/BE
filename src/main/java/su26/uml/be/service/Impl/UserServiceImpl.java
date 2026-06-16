@@ -57,6 +57,24 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public ApiResponse<UserResponse> registerAdmin(UserRegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail()))
+            throw new AppException(ErrorCode.EMAIL_EXISTED);
+
+        User user = userMapper.toUser(request);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+        Role role = roleRepository.findByRoleName("ADMIN")
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+        user.setRole(role);
+
+        user.setStatus("ACTIVE");
+        User savedUser = userRepository.save(user);
+
+        return ApiResponse.success("Tạo tài khoản Admin thành công", userMapper.toUserResponse(savedUser));
+    }
+
+    @Override
     public ApiResponse<List<UserResponse>> getAllUsers() {
         List<User> users = userRepository.findAll();
 

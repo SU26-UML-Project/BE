@@ -10,6 +10,7 @@ import java.util.UUID;
 
 public interface UserService {
     ApiResponse<UserResponse> registerUser(UserRegisterRequest request);
+    ApiResponse<UserResponse> registerAdmin(UserRegisterRequest request);
     ApiResponse<List<UserResponse>> getAllUsers();
     ApiResponse<UserResponse> getUserById(UUID userId);
     ApiResponse<MeResponse> getCurrentUser(String email);
