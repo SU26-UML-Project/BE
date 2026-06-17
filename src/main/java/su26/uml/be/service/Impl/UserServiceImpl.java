@@ -16,7 +16,6 @@ import su26.uml.be.dto.response.MeResponse;
 import su26.uml.be.dto.response.UserResponse;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import su26.uml.be.entity.Role;
 import su26.uml.be.entity.User;
 import su26.uml.be.exception.AppException;
@@ -88,15 +87,11 @@ public class UserServiceImpl implements UserService {
         LocalDateTime deletionDate = LocalDateTime.now().plusMinutes(5);
         user.setStatus(UserStatus.PENDING_DELETE);
         user.setDeletionDate(deletionDate);
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
         return ApiResponse.success("Yêu cầu xóa tài khoản đã được ghi nhận",
-                DeleteAccountResponse.builder()
-                        .status(UserStatus.PENDING_DELETE.name())
-                        .deletionDate(deletionDate)
-                        .daysRemaining(30L)
-                        .message("Tài khoản sẽ bị xóa vĩnh viễn sau 30 ngày. Bạn có thể khôi phục trước thời hạn này.")
-                        .build());
+                userMapper.toDeleteAccountResponse(savedUser, 30L,
+                        "Tài khoản sẽ bị xóa vĩnh viễn sau 30 ngày. Bạn có thể khôi phục trước thời hạn này."));
     }
 
     @Override
@@ -109,16 +104,15 @@ public class UserServiceImpl implements UserService {
 
         user.setStatus(UserStatus.ACTIVE);
         user.setDeletionDate(null);
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
         return ApiResponse.success("Tài khoản đã được khôi phục thành công",
-                DeleteAccountResponse.builder()
-                        .status(UserStatus.ACTIVE.name())
-                        .message("Tài khoản của bạn đã được khôi phục và hoạt động bình thường.")
-                        .build());
+                userMapper.toDeleteAccountResponse(savedUser, null,
+                        "Tài khoản của bạn đã được khôi phục và hoạt động bình thường."));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ApiResponse<List<UserResponse>> getAllUsers() {
         List<User> users = userRepository.findAll();
 
@@ -132,6 +126,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ApiResponse<UserResponse> getUserById(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));

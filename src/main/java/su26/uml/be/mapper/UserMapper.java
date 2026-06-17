@@ -7,6 +7,7 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import su26.uml.be.dto.request.UpdateUserRequest;
 import su26.uml.be.dto.request.UserRegisterRequest;
+import su26.uml.be.dto.response.DeleteAccountResponse;
 import su26.uml.be.dto.response.MeResponse;
 import su26.uml.be.dto.response.UserResponse;
 import su26.uml.be.entity.User;
@@ -29,4 +30,10 @@ public interface UserMapper {
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateUser(UpdateUserRequest request, @MappingTarget User user);
+
+    @Mapping(target = "status", source = "user.status")
+    @Mapping(target = "deletionDate", source = "user.deletionDate")
+    @Mapping(target = "daysRemaining", source = "daysRemaining")
+    @Mapping(target = "message", source = "message")
+    DeleteAccountResponse toDeleteAccountResponse(User user, Long daysRemaining, String message);
 }
