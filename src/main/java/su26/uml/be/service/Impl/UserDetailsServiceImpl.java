@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
+import su26.uml.be.enums.UserStatus;
 import su26.uml.be.repository.UserRepository;
 
 @Service
@@ -31,7 +32,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .username(user.getEmail())
                 .password(user.getPassword())
                 .authorities(authorities)
-                .disabled("LOCKED".equalsIgnoreCase(user.getStatus()))
+                .disabled(UserStatus.LOCKED == user.getStatus())
                 .build();
     }
 }

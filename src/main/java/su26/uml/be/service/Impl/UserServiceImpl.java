@@ -9,9 +9,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import su26.uml.be.dto.request.UpdateUserRequest;
 import su26.uml.be.dto.request.UserRegisterRequest;
+import su26.uml.be.enums.UserStatus;
 import su26.uml.be.dto.response.ApiResponse;
+import su26.uml.be.dto.response.DeleteAccountResponse;
 import su26.uml.be.dto.response.MeResponse;
 import su26.uml.be.dto.response.UserResponse;
+
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import su26.uml.be.entity.Role;
 import su26.uml.be.entity.User;
 import su26.uml.be.exception.AppException;
@@ -50,7 +55,7 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new AppException(ErrorCode.DEFAULT_ROLE_NOT_FOUND));
         user.setRole(role);
 
-        user.setStatus("ACTIVE");
+        user.setStatus(UserStatus.ACTIVE);
         User savedUser = userRepository.save(user);
 
         UserResponse userResponse = userMapper.toUserResponse(savedUser);
@@ -67,6 +72,50 @@ public class UserServiceImpl implements UserService {
         User savedUser = userRepository.save(user);
 
         return ApiResponse.success("Cập nhật thông tin thành công", userMapper.toUserResponse(savedUser));
+    }
+
+    @Override
+    public ApiResponse<DeleteAccountResponse> requestDeleteAccount(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (user.getStatus() == UserStatus.PENDING_DELETE)
+            throw new AppException(ErrorCode.ACCOUNT_ALREADY_PENDING_DELETE);
+
+        if (user.getStatus() == UserStatus.LOCKED)
+            throw new AppException(ErrorCode.USER_INACTIVE);
+
+        LocalDateTime deletionDate = LocalDateTime.now().plusMinutes(5);
+        user.setStatus(UserStatus.PENDING_DELETE);
+        user.setDeletionDate(deletionDate);
+        userRepository.save(user);
+
+        return ApiResponse.success("Yêu cầu xóa tài khoản đã được ghi nhận",
+                DeleteAccountResponse.builder()
+                        .status(UserStatus.PENDING_DELETE.name())
+                        .deletionDate(deletionDate)
+                        .daysRemaining(30L)
+                        .message("Tài khoản sẽ bị xóa vĩnh viễn sau 30 ngày. Bạn có thể khôi phục trước thời hạn này.")
+                        .build());
+    }
+
+    @Override
+    public ApiResponse<DeleteAccountResponse> restoreAccount(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (user.getStatus() != UserStatus.PENDING_DELETE)
+            throw new AppException(ErrorCode.ACCOUNT_NOT_PENDING_DELETE);
+
+        user.setStatus(UserStatus.ACTIVE);
+        user.setDeletionDate(null);
+        userRepository.save(user);
+
+        return ApiResponse.success("Tài khoản đã được khôi phục thành công",
+                DeleteAccountResponse.builder()
+                        .status(UserStatus.ACTIVE.name())
+                        .message("Tài khoản của bạn đã được khôi phục và hoạt động bình thường.")
+                        .build());
     }
 
     @Override

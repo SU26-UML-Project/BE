@@ -3,11 +3,10 @@ package su26.uml.be.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.UuidGenerator;
+import su26.uml.be.enums.UserStatus;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -45,11 +44,15 @@ public class User extends BaseEntity {
     @EqualsAndHashCode.Exclude
     Role role;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    String status;
+    UserStatus status;
+
+    @Column(name = "deletion_date")
+    LocalDateTime deletionDate;
 
     @Column(name = "avatar_url", length = 500)
-    String avatarUrl;
+String avatarUrl;
 
     @Column(name = "dob")
     LocalDate dob;

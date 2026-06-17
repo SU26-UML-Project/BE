@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import su26.uml.be.config.swagger.SwaggerExamples;
 import su26.uml.be.dto.request.UpdateUserRequest;
 import su26.uml.be.dto.request.UserRegisterRequest;
+import su26.uml.be.dto.response.DeleteAccountResponse;
 import su26.uml.be.dto.response.MeResponse;
 import su26.uml.be.dto.response.UserResponse;
 import su26.uml.be.service.UserService;
@@ -88,6 +89,39 @@ public class UserController {
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody UpdateUserRequest request) {
         return userService.updateMe(userDetails.getUsername(), request);
+    }
+
+    @PostMapping("/me/deactivate-request")
+    @Operation(
+            summary = "Request account deletion (30-day grace period)",
+            description = "Marks the account as PENDING_DELETE and sets a deletion deadline 30 days from now. " +
+                    "The account is NOT hard-deleted immediately — a scheduled job runs daily at midnight and " +
+                    "permanently purges accounts whose deadline has passed. " +
+                    "The user can cancel within the 30-day window by calling POST /users/me/restore."
+    )
+    @ApiResponse(responseCode = "200", description = "Deletion request accepted.",
+            content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
+                    examples = @ExampleObject(value = SwaggerExamples.DEACTIVATE_ACCOUNT_RESPONSE)))
+    @ApiResponse(responseCode = "400", description = "Account is already pending deletion or is locked.")
+    public su26.uml.be.dto.response.ApiResponse<DeleteAccountResponse> requestDeleteAccount(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return userService.requestDeleteAccount(userDetails.getUsername());
+    }
+
+    @PostMapping("/me/restore")
+    @Operation(
+            summary = "Cancel account deletion and restore to ACTIVE",
+            description = "Cancels a pending deletion request within the 30-day grace period. " +
+                    "Sets status back to ACTIVE and clears the deletion deadline. " +
+                    "Returns 400 if the account is not currently in PENDING_DELETE state."
+    )
+    @ApiResponse(responseCode = "200", description = "Account restored successfully.",
+            content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
+                    examples = @ExampleObject(value = SwaggerExamples.RESTORE_ACCOUNT_RESPONSE)))
+    @ApiResponse(responseCode = "400", description = "Account is not in PENDING_DELETE state.")
+    public su26.uml.be.dto.response.ApiResponse<DeleteAccountResponse> restoreAccount(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return userService.restoreAccount(userDetails.getUsername());
     }
 
     @GetMapping("/me")
