@@ -24,6 +24,7 @@ import su26.uml.be.entity.User;
 import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.repository.UserRepository;
+import su26.uml.be.enums.UserStatus;
 import su26.uml.be.service.AuthenticationService;
 import su26.uml.be.service.TokenBlacklistService;
 
@@ -124,7 +125,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             var user = userRepository.findById(UUID.fromString(userIdStr))
                     .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-            if ("LOCKED".equalsIgnoreCase(user.getStatus())) {
+            if (UserStatus.LOCKED == user.getStatus()) {
                 throw new AppException(ErrorCode.USER_INACTIVE);
             }
 
@@ -159,7 +160,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             userOpt = userRepository.findByUsername(normalized);
         }
         return userOpt
-                .map(user -> "LOCKED".equalsIgnoreCase(user.getStatus()))
+                .map(user -> UserStatus.LOCKED == user.getStatus())
                 .orElse(false);
     }
 
@@ -175,7 +176,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new AppException(ErrorCode.INVALID_CREDENTIALS);
         }
 
-        if ("LOCKED".equalsIgnoreCase(user.getStatus())) {
+        if (UserStatus.LOCKED == user.getStatus()) {
             throw new AppException(ErrorCode.USER_INACTIVE);
         }
 
@@ -201,7 +202,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     @Transactional
     public AuthenticationResponse generateTokenForOAuth2User(User user) {
-        if ("LOCKED".equalsIgnoreCase(user.getStatus())) {
+        if (UserStatus.LOCKED == user.getStatus()) {
             throw new AppException(ErrorCode.USER_INACTIVE);
         }
 

@@ -8,6 +8,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import su26.uml.be.dto.request.UserRegisterRequest;
+import su26.uml.be.enums.UserStatus;
 import su26.uml.be.dto.response.ApiResponse;
 import su26.uml.be.dto.response.UserResponse;
 import su26.uml.be.entity.Role;
@@ -43,7 +44,7 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
         user.setRole(role);
 
-        user.setStatus("ACTIVE");
+        user.setStatus(UserStatus.ACTIVE);
         User savedUser = userRepository.save(user);
 
         return ApiResponse.success("Tạo tài khoản Admin thành công", userMapper.toUserResponse(savedUser));

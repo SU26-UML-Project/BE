@@ -18,6 +18,7 @@ import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.mapper.OAuth2UserMapper;
 import su26.uml.be.repository.RoleRepository;
 import su26.uml.be.repository.UserRepository;
+import su26.uml.be.enums.UserStatus;
 import su26.uml.be.service.CustomOAuth2UserService;
 
 import java.util.Collections;
@@ -105,7 +106,7 @@ public class CustomOAuth2UserServiceImpl extends DefaultOAuth2UserService implem
                 .googleId(googleId)
                 .provider("GOOGLE")
                 .avatarUrl(picture)
-                .status("ACTIVE")
+                .status(UserStatus.ACTIVE)
                 .build();
 
         User newUser = oauth2UserMapper.toUser(info);

@@ -68,6 +68,28 @@ public final class SwaggerExamples {
               "phone": "0901234567"
             }""";
 
+    public static final String DEACTIVATE_ACCOUNT_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Yêu cầu xóa tài khoản đã được ghi nhận",
+              "result": {
+                "status": "PENDING_DELETE",
+                "deletionDate": "2026-07-17T00:00:00",
+                "daysRemaining": 30,
+                "message": "Tài khoản sẽ bị xóa vĩnh viễn sau 30 ngày. Bạn có thể khôi phục trước thời hạn này."
+              }
+            }""";
+
+    public static final String RESTORE_ACCOUNT_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Tài khoản đã được khôi phục thành công",
+              "result": {
+                "status": "ACTIVE",
+                "message": "Tài khoản của bạn đã được khôi phục và hoạt động bình thường."
+              }
+            }""";
+
     public static final String UPDATE_USER_REQUEST = """
             {
               "fullName": "Nguyen Van B",

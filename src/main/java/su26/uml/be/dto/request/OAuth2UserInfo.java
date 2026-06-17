@@ -2,6 +2,7 @@ package su26.uml.be.dto.request;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import su26.uml.be.enums.UserStatus;
 
 @Data
 @Builder
@@ -15,5 +16,5 @@ public class OAuth2UserInfo {
     String googleId;
     String provider;
     String avatarUrl;
-    String status;
+    UserStatus status;
 }

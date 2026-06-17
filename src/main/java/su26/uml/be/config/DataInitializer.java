@@ -11,6 +11,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import su26.uml.be.entity.Role;
 import su26.uml.be.entity.User;
+import su26.uml.be.enums.UserStatus;
 import su26.uml.be.repository.RoleRepository;
 import su26.uml.be.repository.UserRepository;
 
@@ -60,7 +61,7 @@ public class DataInitializer implements CommandLineRunner {
                     .password(passwordEncoder.encode("Password123"))
                     .fullName("System Administrator")
                     .phone("0123456789")
-                    .status("ACTIVE")
+                    .status(UserStatus.ACTIVE)
                     .role(adminRole)
                     .build();
             userRepository.save(adminUser);
