@@ -16,8 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import su26.uml.be.config.swagger.SwaggerExamples;
-import su26.uml.be.dto.request.UpdateUserRequest;
-import su26.uml.be.dto.request.UserRegisterRequest;
+import su26.uml.be.dto.request.*;
 import su26.uml.be.dto.response.DeleteAccountResponse;
 import su26.uml.be.dto.response.MeResponse;
 import su26.uml.be.dto.response.UserResponse;
@@ -134,5 +133,45 @@ public class UserController {
     public su26.uml.be.dto.response.ApiResponse<MeResponse> getCurrentUser(
             @AuthenticationPrincipal UserDetails userDetails) {
         return userService.getCurrentUser(userDetails.getUsername());
+    }
+
+    //reset password
+    @PostMapping("/forgot-password")
+    @SecurityRequirements({})
+    @Operation(
+            summary = "Request a password-reset OTP",
+            description = "Validates the email exists, invalidates any previous reset tokens, generates a 6-digit OTP " +
+                    "valid for 1 minute 30 seconds, and emails it to the user. Returns 404 if the email is not registered."
+    )
+    @ApiResponse(responseCode = "200", description = "OTP sent to the user's email.")
+    @ApiResponse(responseCode = "404", description = "Email not found.")
+    public su26.uml.be.dto.response.ApiResponse<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return userService.forgotPassword(request);
+    }
+
+    @PostMapping("/verify-otp")
+    @SecurityRequirements({})
+    @Operation(
+            summary = "Verify a password-reset OTP",
+            description = "Checks that the OTP matches the email, has not been used, and has not expired. " +
+                    "Does not consume the OTP — it is consumed only on POST /users/reset-password."
+    )
+    @ApiResponse(responseCode = "200", description = "OTP is valid.")
+    @ApiResponse(responseCode = "400", description = "OTP is invalid, used, or expired.")
+    public su26.uml.be.dto.response.ApiResponse<String> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        return userService.verifyOtp(request);
+    }
+
+    @PostMapping("/reset-password")
+    @SecurityRequirements({})
+    @Operation(
+            summary = "Reset password with a verified OTP",
+            description = "Re-validates the OTP, ensures newPassword equals confirmPassword, updates the user's password " +
+                    "(BCrypt), and marks the OTP as used so it cannot be reused."
+    )
+    @ApiResponse(responseCode = "200", description = "Password reset successfully.")
+    @ApiResponse(responseCode = "400", description = "OTP invalid/expired/used or passwords do not match.")
+    public su26.uml.be.dto.response.ApiResponse<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return userService.resetPassword(request);
     }
 }

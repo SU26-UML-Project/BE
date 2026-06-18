@@ -7,8 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import su26.uml.be.dto.request.UpdateUserRequest;
-import su26.uml.be.dto.request.UserRegisterRequest;
+import su26.uml.be.dto.request.*;
 import su26.uml.be.enums.UserStatus;
 import su26.uml.be.dto.response.ApiResponse;
 import su26.uml.be.dto.response.DeleteAccountResponse;
@@ -23,9 +22,13 @@ import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.mapper.UserMapper;
 import su26.uml.be.repository.RoleRepository;
 import su26.uml.be.repository.UserRepository;
+import su26.uml.be.service.EmailService;
+import su26.uml.be.service.OtpService;
+import su26.uml.be.service.RefreshTokenService;
 import su26.uml.be.service.UserService;
 
 
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,9 +41,15 @@ public class UserServiceImpl implements UserService {
     UserRepository userRepository;
     RoleRepository roleRepository;
 
+    EmailService emailService;
+    OtpService otpService;
+    RefreshTokenService refreshTokenService;
+
     UserMapper userMapper;
 
     PasswordEncoder passwordEncoder;
+
+    static SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Override
     public ApiResponse<UserResponse> registerUser(UserRegisterRequest request) {
@@ -145,5 +154,64 @@ public class UserServiceImpl implements UserService {
         MeResponse meResponse = userMapper.toMeResponse(user);
 
         return ApiResponse.success("Lấy thông tin người dùng hiện tại thành công", meResponse);
+    }
+
+    @Override
+    public ApiResponse<String> forgotPassword(ForgotPasswordRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+
+        String otpCode = generateOtp();
+
+        // Lưu OTP (đã hash) trong Redis kèm TTL — thay cho bảng password_reset_tokens.
+        otpService.storeOtp(user.getEmail(), otpCode);
+        emailService.sendForgotPasswordOtpEmail(user.getEmail(), otpCode, user.getFullName());
+        return ApiResponse.success("Mã OTP đã được gửi đến email của bạn", null);
+    }
+
+    @Override
+    public ApiResponse<String> verifyOtp(VerifyOtpRequest request) {
+        userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+
+        // Ném AppException nếu OTP sai/hết hạn/vượt số lần thử.
+        otpService.verifyOtp(request.getEmail(), request.getOtpCode());
+        otpService.markVerified(request.getEmail());
+
+        return ApiResponse.success("Mã OTP hợp lệ");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> resetPassword(ResetPasswordRequest request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new AppException(ErrorCode.PASSWORDS_NOT_MATCH);
+        }
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+
+        // Chỉ cho đổi mật khẩu khi OTP đã được verify ở bước trước (cờ ngắn hạn trong Redis).
+        if (!otpService.isVerified(request.getEmail())) {
+            throw new AppException(ErrorCode.OTP_NOT_VERIFIED);
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setLastPasswordChangeAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        // OTP dùng một lần: xoá toàn bộ trạng thái OTP sau khi đổi thành công.
+        otpService.invalidate(request.getEmail());
+
+        // Vô hiệu hoá mọi phiên đăng nhập cũ sau khi đổi mật khẩu.
+        refreshTokenService.revokeAllTokens(user.getId().toString());
+        refreshTokenService.setLogoutTime(user.getEmail());
+
+        return ApiResponse.success("Đặt lại mật khẩu thành công");
+    }
+
+    private String generateOtp() {
+        int otp = 100000 + SECURE_RANDOM.nextInt(900000);
+        return String.valueOf(otp);
     }
 }

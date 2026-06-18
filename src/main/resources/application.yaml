@@ -7,8 +7,8 @@ spring:
   application:
     name: ${APP_NAME}
 
-#  config:
-#    import: optional:file:BE/.env[.properties]
+  config:
+    import: optional:file:BE/.env[.properties]
 
   datasource:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require
@@ -46,6 +46,18 @@ spring:
   jackson:
     time-zone: ${APP_TIMEZONE}
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   security:
     oauth2:
       client:
@@ -65,6 +77,14 @@ jwt:
   signerKey: ${JWT_SIGNER_KEY}
   accessTokenExpiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600}
   refreshTokenExpiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800}
+
+otp:
+  # Thời gian sống của OTP đặt lại mật khẩu (giây).
+  ttl-seconds: ${OTP_TTL_SECONDS:90}
+  # Số lần nhập sai tối đa trước khi OTP bị vô hiệu hoá (chống brute-force).
+  max-attempts: ${OTP_MAX_ATTEMPTS:5}
+  # Thời gian giữ cờ "đã verify OTP" để cho phép đặt lại mật khẩu (giây).
+  verified-ttl-seconds: ${OTP_VERIFIED_TTL_SECONDS:300}
 
 app:
   oauth2:
