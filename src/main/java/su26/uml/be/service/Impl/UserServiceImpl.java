@@ -64,6 +64,7 @@ public class UserServiceImpl implements UserService {
         user.setRole(role);
 
         user.setStatus(UserStatus.ACTIVE);
+        user.setProfileCompleted(true); // tài khoản đăng ký thường đã có đủ thông tin
         User savedUser = userRepository.save(user);
 
         UserResponse userResponse = userMapper.toUserResponse(savedUser);
@@ -80,6 +81,58 @@ public class UserServiceImpl implements UserService {
         User savedUser = userRepository.save(user);
 
         return ApiResponse.success("Cập nhật thông tin thành công", userMapper.toUserResponse(savedUser));
+    }
+
+    @Override
+    public ApiResponse<UserResponse> completeProfile(String email, CompleteProfileRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        // Onboarding is one-time only: refuse if the profile is already completed.
+        if (Boolean.TRUE.equals(user.getProfileCompleted())) {
+            throw new AppException(ErrorCode.PROFILE_ALREADY_COMPLETED);
+        }
+
+        // Never trust the FE: re-validate password match + strength on the server.
+        if (!request.getPassword().equals(request.getConfirmPassword())) {
+            throw new AppException(ErrorCode.PASSWORDS_NOT_MATCH);
+        }
+        if (passwordStrength(request.getPassword()) < MIN_PASSWORD_STRENGTH) {
+            throw new AppException(ErrorCode.WEAK_PASSWORD);
+        }
+
+        userMapper.completeProfile(request, user);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setLastPasswordChangeAt(LocalDateTime.now());
+        user.setProfileCompleted(true); // đánh dấu đã hoàn tất onboarding
+        User savedUser = userRepository.save(user);
+
+        // Confirmation email — never includes the plaintext password.
+        try {
+            emailService.sendAccountSetupSuccessEmail(
+                    savedUser.getEmail(), savedUser.getFullName(), savedUser.getLastPasswordChangeAt());
+        } catch (Exception e) {
+            // Email is best-effort: onboarding must still succeed if SMTP hiccups.
+            log.warn("Không thể gửi email xác nhận thiết lập tài khoản cho {}: {}", savedUser.getEmail(), e.getMessage());
+        }
+
+        return ApiResponse.success("Đã lưu thông tin, email xác nhận đã được gửi",
+                userMapper.toUserResponse(savedUser));
+    }
+
+    // Minimum acceptable strength = "Trung bình" (3 of 5 criteria), matching the FE meter.
+    private static final int MIN_PASSWORD_STRENGTH = 3;
+
+    /** Count satisfied criteria: length>=8, uppercase, lowercase, digit, special char. */
+    private int passwordStrength(String pw) {
+        if (pw == null) return 0;
+        int score = 0;
+        if (pw.length() >= 8) score++;
+        if (pw.matches(".*[A-Z].*")) score++;
+        if (pw.matches(".*[a-z].*")) score++;
+        if (pw.matches(".*\\d.*")) score++;
+        if (pw.matches(".*[^A-Za-z0-9].*")) score++;
+        return score;
     }
 
     @Override
@@ -154,6 +207,17 @@ public class UserServiceImpl implements UserService {
         MeResponse meResponse = userMapper.toMeResponse(user);
 
         return ApiResponse.success("Lấy thông tin người dùng hiện tại thành công", meResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<UserResponse> getMyProfile(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        UserResponse userResponse = userMapper.toUserResponse(user);
+
+        return ApiResponse.success("Lấy hồ sơ cá nhân thành công", userResponse);
     }
 
     @Override

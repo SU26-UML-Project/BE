@@ -63,4 +63,9 @@ public class User extends BaseEntity {
     @Column(name = "last_password_change_at")
     LocalDateTime lastPasswordChangeAt;
 
+    // true = đã hoàn tất hồ sơ (đăng ký thường, hoặc Google user đã onboarding).
+    // false = Google user đăng nhập lần đầu, chưa bổ sung thông tin → phải qua onboarding wizard.
+    @Column(name = "profile_completed")
+    Boolean profileCompleted;
+
 }

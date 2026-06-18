@@ -135,4 +135,66 @@ public final class SwaggerExamples {
                 }
               }
             }""";
+
+    public static final String COMPLETE_PROFILE_REQUEST = """
+            {
+              "fullName": "Nguyen Van A",
+              "phone": "0901234567",
+              "dob": "2000-01-15",
+              "password": "Passw0rd!",
+              "confirmPassword": "Passw0rd!"
+            }""";
+
+    public static final String COMPLETE_PROFILE_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Đã lưu thông tin, email xác nhận đã được gửi",
+              "result": {
+                "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "username": "nguyenvana",
+                "fullName": "Nguyen Van A",
+                "email": "nguyenvana@gmail.com",
+                "phone": "0901234567",
+                "dob": "2000-01-15",
+                "status": "ACTIVE",
+                "role": {
+                  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                  "roleName": "USER",
+                  "description": "Standard application user"
+                }
+              }
+            }""";
+
+    // ─── Files / Storage ────────────────────────────────
+    public static final String UPLOAD_AVATAR_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Tải ảnh đại diện thành công",
+              "result": {
+                "bucket": "avatars",
+                "path": "3fa85f64-5717-4562-b3fc-2c963f66afa6/9f1c2a3b-_avatar.png",
+                "url": "https://xyz.supabase.co/storage/v1/object/public/avatars/3fa85f64-5717-4562-b3fc-2c963f66afa6/9f1c2a3b-_avatar.png"
+              }
+            }""";
+
+    public static final String UPLOAD_DOCUMENT_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Tải tài liệu thành công",
+              "result": {
+                "bucket": "documents",
+                "path": "3fa85f64-5717-4562-b3fc-2c963f66afa6/4d2e1f0a-_report.pdf",
+                "url": null
+              }
+            }""";
+
+    public static final String SIGNED_URL_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Tạo đường dẫn truy cập thành công",
+              "result": {
+                "signedUrl": "https://xyz.supabase.co/storage/v1/object/sign/documents/3fa85f64-5717-4562-b3fc-2c963f66afa6/4d2e1f0a-_report.pdf?token=eyJ...",
+                "expiresInSeconds": 3600
+              }
+            }""";
 }

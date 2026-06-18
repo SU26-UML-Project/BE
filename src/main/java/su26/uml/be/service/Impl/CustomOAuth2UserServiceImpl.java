@@ -111,6 +111,7 @@ public class CustomOAuth2UserServiceImpl extends DefaultOAuth2UserService implem
 
         User newUser = oauth2UserMapper.toUser(info);
         newUser.setRole(defaultRole);
+        newUser.setProfileCompleted(false); // Google user lần đầu: phải qua onboarding
 
         User saved = userRepository.save(newUser);
         log.info("Tạo user mới từ Google OAuth2: {}", email);

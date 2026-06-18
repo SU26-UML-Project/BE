@@ -5,6 +5,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
+import su26.uml.be.dto.request.CompleteProfileRequest;
 import su26.uml.be.dto.request.UpdateUserRequest;
 import su26.uml.be.dto.request.UserRegisterRequest;
 import su26.uml.be.dto.response.DeleteAccountResponse;
@@ -26,10 +27,15 @@ public interface UserMapper {
     List<UserResponse> toUserResponseList(List<User> users);
 
     @Mapping(target = "role", source = "role.roleName")
+    // profileCompleted maps directly from the User.profileCompleted column (source of truth).
     MeResponse toMeResponse(User user);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateUser(UpdateUserRequest request, @MappingTarget User user);
+
+    // Onboarding: only personal info is mapped here; the password hash is set in the service.
+    @Mapping(target = "password", ignore = true)
+    void completeProfile(CompleteProfileRequest request, @MappingTarget User user);
 
     @Mapping(target = "status", source = "user.status")
     @Mapping(target = "deletionDate", source = "user.deletionDate")

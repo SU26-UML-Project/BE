@@ -90,6 +90,27 @@ public class UserController {
         return userService.updateMe(userDetails.getUsername(), request);
     }
 
+    @PatchMapping("/complete-profile")
+    @Operation(
+            summary = "Complete first-time onboarding (OAuth2 users)",
+            description = "One-time onboarding for a Google user who has not finished their profile yet. " +
+                    "Sets fullName, phone, dob and a self-chosen password (BCrypt-hashed), marks the profile as " +
+                    "completed (password becomes non-null), and emails a setup-success confirmation (never the password). " +
+                    "Requires a valid access token and fails with PROFILE_ALREADY_COMPLETED if the profile is already done."
+    )
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(schema = @Schema(implementation = CompleteProfileRequest.class),
+                    examples = @ExampleObject(value = SwaggerExamples.COMPLETE_PROFILE_REQUEST)))
+    @ApiResponse(responseCode = "200", description = "Onboarding completed; confirmation email sent.",
+            content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
+                    examples = @ExampleObject(value = SwaggerExamples.COMPLETE_PROFILE_RESPONSE)))
+    @ApiResponse(responseCode = "400", description = "Profile already completed, weak password, or passwords do not match.")
+    public su26.uml.be.dto.response.ApiResponse<UserResponse> completeProfile(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody CompleteProfileRequest request) {
+        return userService.completeProfile(userDetails.getUsername(), request);
+    }
+
     @PostMapping("/me/deactivate-request")
     @Operation(
             summary = "Request account deletion (30-day grace period)",
@@ -133,6 +154,19 @@ public class UserController {
     public su26.uml.be.dto.response.ApiResponse<MeResponse> getCurrentUser(
             @AuthenticationPrincipal UserDetails userDetails) {
         return userService.getCurrentUser(userDetails.getUsername());
+    }
+
+    @GetMapping("/me/profile")
+    @Operation(
+            summary = "Get the current user's full profile",
+            description = "Returns the complete profile (fullName, phone, dob, avatarUrl, status, createdAt, role, ...) " +
+                    "of the authenticated user resolved from the JWT. Unlike GET /users/me (lightweight identity), " +
+                    "this is intended for the profile page."
+    )
+    @ApiResponse(responseCode = "200", description = "Profile returned.")
+    public su26.uml.be.dto.response.ApiResponse<UserResponse> getMyProfile(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return userService.getMyProfile(userDetails.getUsername());
     }
 
     //reset password

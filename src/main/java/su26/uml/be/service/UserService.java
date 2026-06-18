@@ -12,11 +12,13 @@ import java.util.UUID;
 public interface UserService {
     ApiResponse<UserResponse> registerUser(UserRegisterRequest request);
     ApiResponse<UserResponse> updateMe(String email, UpdateUserRequest request);
+    ApiResponse<UserResponse> completeProfile(String email, CompleteProfileRequest request);
     ApiResponse<DeleteAccountResponse> requestDeleteAccount(String email);
     ApiResponse<DeleteAccountResponse> restoreAccount(String email);
     ApiResponse<List<UserResponse>> getAllUsers();
     ApiResponse<UserResponse> getUserById(UUID userId);
     ApiResponse<MeResponse> getCurrentUser(String email);
+    ApiResponse<UserResponse> getMyProfile(String email);
 
     ApiResponse<String> forgotPassword(ForgotPasswordRequest request);
     ApiResponse<String> verifyOtp(VerifyOtpRequest request);
