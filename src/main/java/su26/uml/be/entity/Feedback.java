@@ -38,8 +38,8 @@ public class Feedback extends BaseEntity {
     Recommendation recommendation;
 
     @OneToOne
-    @JoinColumn(name = "sheet_diagram_id", unique = true)
+    @JoinColumn(name = "project_diagram_id", unique = true)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    SheetDiagram sheetDiagram;
+    ProjectDiagram projectDiagram;
 }

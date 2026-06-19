@@ -3,28 +3,25 @@ package su26.uml.be.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
-@Table(name = "sheet_versions")
+@Table(name = "project_versions")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class SheetVersion extends BaseEntity {
+public class ProjectVersion extends BaseEntity {
 
     @Column(name = "version_number", nullable = false)
     Integer versionNumber;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "sheet_snapshot")
-    String sheetSnapshot;
+    @Column(name = "project_snapshot", columnDefinition = "TEXT")
+    String projectSnapshot;
 
     @ManyToOne
-    @JoinColumn(name = "sheet_id", nullable = false)
+    @JoinColumn(name = "project_id", nullable = false)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    Sheet sheet;
+    Project project;
 }

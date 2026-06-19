@@ -92,7 +92,19 @@ public enum ErrorCode {
     FILE_UPLOAD_FAILED(1704, "Tải file lên thất bại, vui lòng thử lại", HttpStatus.INTERNAL_SERVER_ERROR),
     FILE_DELETE_FAILED(1705, "Xóa file thất bại, vui lòng thử lại", HttpStatus.INTERNAL_SERVER_ERROR),
     SIGNED_URL_FAILED(1706, "Không thể tạo đường dẫn truy cập file", HttpStatus.INTERNAL_SERVER_ERROR),
-    FILE_PATH_REQUIRED(1707, "Đường dẫn file không được để trống", HttpStatus.BAD_REQUEST),;
+    FILE_PATH_REQUIRED(1707, "Đường dẫn file không được để trống", HttpStatus.BAD_REQUEST),
+
+    // PROJECT ERRORS
+    PROJECT_NAME_REQUIRED(1800, "Tên dự án không được để trống", HttpStatus.BAD_REQUEST),
+    PROJECT_NAME_TOO_LONG(1801, "Tên dự án không được vượt quá 255 ký tự", HttpStatus.BAD_REQUEST),
+    DESCRIPTION_TOO_LONG(1802, "Mô tả không được vượt quá 1000 ký tự", HttpStatus.BAD_REQUEST),
+    PROJECT_NOT_FOUND(1803, "Không tìm thấy dự án", HttpStatus.NOT_FOUND),
+    PROJECT_ACCESS_DENIED(1804, "Bạn không có quyền truy cập dự án này", HttpStatus.FORBIDDEN),
+
+    // SHEET ERRORS
+    SHEET_NOT_FOUND(1900, "Không tìm thấy trang biểu đồ", HttpStatus.NOT_FOUND),
+    SHEET_NAME_REQUIRED(1901, "Tên trang không được để trống", HttpStatus.BAD_REQUEST),
+    ;
 
     private int code;
     private String message;
