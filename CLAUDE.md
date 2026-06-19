@@ -43,6 +43,7 @@ BE/
     ├── config/
     │   ├── RedisConfig.java                 — RedisTemplate<String,String> bean
     │   ├── TimezoneVerificationConfig.java  — Timezone setup on startup
+    │   ├── AccountDeletionScheduler.java    — @Scheduled(cron "0 0 0 * * *") daily purge of PENDING_DELETE accounts past deletionDate
     │   ├── TokenCleanupTask.java            — @Deprecated/DISABLED (commented out); refresh tokens now expire via Redis TTL
     │   ├── security/                        — ONLY legacy DISABLED files remain here (kept untouched for rollback)
     │   │   ├── CustomJwtDecoder.java        — @Deprecated/DISABLED (commented out); old OAuth2 Resource Server JwtDecoder
@@ -62,7 +63,8 @@ BE/
     ├── controller/
     │   ├── AuthenticationController.java    — POST /auth/{login,refresh,introspect,logout}, GET /auth/account-status
     │   ├── UserController.java              — /users: register, GET/PATCH me, me/profile, complete-profile (onboarding),
-    │   │                                       me/deactivate-request, me/restore, forgot-password, verify-otp, reset-password,
+    │   │                                       me/deactivate-request, me/restore, me/change-password/{init,confirm} (authenticated),
+    │   │                                       forgot-password, verify-otp, reset-password,
     │   │                                       GET (list, ADMIN), GET /{userId} (ADMIN)
     │   ├── AdminController.java             — Admin-only user management (@PreAuthorize ROLE_ADMIN)
     │   └── FileController.java              — /files: POST avatar, POST documents, GET documents/signed-url (Supabase Storage)
@@ -274,6 +276,20 @@ placeholder `"GOOGLE_OAUTH2_USER"`). They must finish a one-time onboarding befo
      The email **never** contains the plaintext password — only a confirmation + a "forgot password" link (`app.frontend.base-url`).
   6. Returns `UserResponse`.
 - **New ErrorCodes:** `WEAK_PASSWORD` (1074), `PROFILE_ALREADY_COMPLETED` (1075), `DOB_REQUIRED` (1076).
+
+### Change password (in-app, authenticated) — `POST /users/me/change-password/{init,confirm}`
+Đổi mật khẩu khi **đang đăng nhập** (khác với forgot/reset là public). Hai bước, bảo vệ bằng OTP, dùng chung `OtpService` (Redis, OTP hash + TTL 90s) và email template riêng `sendChangePasswordOtpEmail`.
+1. **`initChangePassword(email, ChangePasswordInitRequest)`** (`UserServiceImpl`):
+   - `findByEmail` → `USER_NOT_EXISTED`.
+   - Xác minh mật khẩu hiện tại: `password == null` (Google user chưa onboarding) hoặc `!passwordEncoder.matches(...)` → `PASSWORD_INCORRECT` (1070).
+   - **Giới hạn 7 ngày:** nếu `lastPasswordChangeAt` nằm trong 7 ngày gần nhất → `PASSWORD_CHANGE_LIMIT` (1071).
+   - Sinh OTP → `otpService.storeOtp(email, otp)` → `emailService.sendChangePasswordOtpEmail(...)`. Trả `ApiResponse<String>`.
+2. **Cổng OTP cho UI:** FE gọi lại `POST /users/verify-otp` (public, không tiêu thụ OTP) để mở bước nhập mật khẩu mới — không cần endpoint riêng.
+3. **`confirmChangePassword(email, ChangePasswordConfirmRequest)`** (`UserServiceImpl`):
+   - `findByEmail`; re-validate `newPassword == confirmPassword` → `PASSWORDS_NOT_MATCH`; độ mạnh ≥ `MIN_PASSWORD_STRENGTH` (3) **và** length ≥ 8 → `WEAK_PASSWORD`.
+   - `otpService.verifyOtp(email, otpCode)` (ném khi sai/hết hạn/quá số lần) → set BCrypt password + `lastPasswordChangeAt` → `otpService.invalidate(email)`.
+   - **Giữ session hiện tại — KHÔNG revoke token** (chủ ý: đổi mật khẩu ngay trong app không nên đá user ra). Khác với `resetPassword` (public) có `revokeAllTokens` + `setLogoutTime`.
+   - DTO `ChangePasswordInitRequest`/`ChangePasswordConfirmRequest` theo convention chung (`@Data @Builder @AllArgsConstructor @NoArgsConstructor @FieldDefaults`, message = ErrorCode key).
 
 ### Refresh — `POST /auth/refresh` (public)
 1. Read refresh JWT from HttpOnly cookie (`AUTH_COOKIE_NAME`) → `UNAUTHENTICATED` if missing.

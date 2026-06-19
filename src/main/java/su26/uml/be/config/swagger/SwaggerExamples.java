@@ -90,6 +90,33 @@ public final class SwaggerExamples {
               }
             }""";
 
+    // ─── Change password (authenticated, OTP) ──────────
+    public static final String CHANGE_PASSWORD_INIT_REQUEST = """
+            {
+              "currentPassword": "OldPass@123"
+            }""";
+
+    public static final String CHANGE_PASSWORD_INIT_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Mã OTP đổi mật khẩu đã được gửi đến email của bạn",
+              "result": null
+            }""";
+
+    public static final String CHANGE_PASSWORD_CONFIRM_REQUEST = """
+            {
+              "otpCode": "123456",
+              "newPassword": "NewPass@123",
+              "confirmPassword": "NewPass@123"
+            }""";
+
+    public static final String CHANGE_PASSWORD_CONFIRM_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Đổi mật khẩu thành công",
+              "result": null
+            }""";
+
     public static final String UPDATE_USER_REQUEST = """
             {
               "fullName": "Nguyen Van B",

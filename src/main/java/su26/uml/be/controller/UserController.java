@@ -208,4 +208,47 @@ public class UserController {
     public su26.uml.be.dto.response.ApiResponse<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         return userService.resetPassword(request);
     }
+
+    // change password (authenticated, in-app, OTP-protected)
+    @PostMapping("/me/change-password/init")
+    @Operation(
+            summary = "Start an in-app password change (step 1)",
+            description = "For the authenticated user: verifies the current password and, if correct, emails a 6-digit OTP " +
+                    "valid for 2 minutes. Enforces a 7-day cool-down between password changes. " +
+                    "Fails with PASSWORD_INCORRECT (1070) if the current password is wrong and PASSWORD_CHANGE_LIMIT (1071) " +
+                    "if a change was already made within the last 7 days."
+    )
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(schema = @Schema(implementation = ChangePasswordInitRequest.class),
+                    examples = @ExampleObject(value = SwaggerExamples.CHANGE_PASSWORD_INIT_REQUEST)))
+    @ApiResponse(responseCode = "200", description = "OTP sent to the user's email.",
+            content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
+                    examples = @ExampleObject(value = SwaggerExamples.CHANGE_PASSWORD_INIT_RESPONSE)))
+    @ApiResponse(responseCode = "400", description = "Current password incorrect or 7-day change limit reached.")
+    public su26.uml.be.dto.response.ApiResponse<String> initChangePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody ChangePasswordInitRequest request) {
+        return userService.initChangePassword(userDetails.getUsername(), request);
+    }
+
+    @PostMapping("/me/change-password/confirm")
+    @Operation(
+            summary = "Confirm an in-app password change (step 2)",
+            description = "For the authenticated user: validates the OTP, ensures newPassword equals confirmPassword and meets " +
+                    "the strength rule (≥ Medium, length ≥ 8), then updates the password (BCrypt) and consumes the OTP. " +
+                    "The current session stays logged in. Fails with WEAK_PASSWORD (1074), PASSWORDS_NOT_MATCH (1065), " +
+                    "or an OTP error if the code is invalid/expired."
+    )
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(schema = @Schema(implementation = ChangePasswordConfirmRequest.class),
+                    examples = @ExampleObject(value = SwaggerExamples.CHANGE_PASSWORD_CONFIRM_REQUEST)))
+    @ApiResponse(responseCode = "200", description = "Password changed successfully.",
+            content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
+                    examples = @ExampleObject(value = SwaggerExamples.CHANGE_PASSWORD_CONFIRM_RESPONSE)))
+    @ApiResponse(responseCode = "400", description = "OTP invalid/expired, weak password, or passwords do not match.")
+    public su26.uml.be.dto.response.ApiResponse<String> confirmChangePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody ChangePasswordConfirmRequest request) {
+        return userService.confirmChangePassword(userDetails.getUsername(), request);
+    }
 }

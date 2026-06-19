@@ -53,7 +53,7 @@ public class EmailServiceImpl implements EmailService {
                 "Bạn đang thực hiện <b>đổi mật khẩu</b> cho tài khoản " + BRAND_NAME + " của mình.",
                 otpCode,
                 "#7c3aed",
-                "Mã có hiệu lực trong 2 phút.",
+                "Mã có hiệu lực trong 1 phút 30 giây.",
                 "Nếu bạn không thực hiện thao tác này, vui lòng đổi mật khẩu ngay hoặc liên hệ quản trị viên " + BRAND_NAME + "."
         );
 

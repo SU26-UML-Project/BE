@@ -58,7 +58,7 @@ BE/
 │   │   └── OAuth2AuthenticationSuccessHandler.java
 │   ├── controller/
 │   │   ├── AuthenticationController.java     ← /auth: login, refresh, introspect, logout, account-status
-│   │   ├── UserController.java              ← /users: register, me, profile, complete-profile, deactivate/restore, OTP reset, list (ADMIN)
+│   │   ├── UserController.java              ← /users: register, me, profile, complete-profile, deactivate/restore, change-password (init/confirm), OTP reset, list (ADMIN)
 │   │   ├── AdminController.java             ← quản lý user (ADMIN, @PreAuthorize ROLE_ADMIN)
 │   │   └── FileController.java              ← /files: avatar, documents, signed-url (Supabase Storage)
 │   ├── dto/
@@ -252,8 +252,10 @@ Sau khi redirect thành công, FE gọi `POST /auth/refresh` để lấy access 
 | GET | `/users/me/profile` | Hồ sơ đầy đủ của user hiện tại | Authenticated |
 | PATCH | `/users/me` | Cập nhật hồ sơ một phần (fullName, phone, dob, avatarUrl) | Authenticated |
 | PATCH | `/users/complete-profile` | Onboarding lần đầu cho user Google (đặt password + hồ sơ) | Authenticated |
-| POST | `/users/me/deactivate-request` | Yêu cầu vô hiệu hoá tài khoản (grace 30 ngày) | Authenticated |
+| POST | `/users/me/deactivate-request` | Yêu cầu xoá tài khoản (grace 30 ngày, sau đó scheduler purge) | Authenticated |
 | POST | `/users/me/restore` | Khôi phục tài khoản đang chờ xoá | Authenticated |
+| POST | `/users/me/change-password/init` | Đổi mật khẩu bước 1: xác minh mật khẩu hiện tại → gửi OTP qua email | Authenticated |
+| POST | `/users/me/change-password/confirm` | Đổi mật khẩu bước 2: xác minh OTP + đặt mật khẩu mới | Authenticated |
 | POST | `/users/forgot-password` | Gửi OTP đặt lại mật khẩu qua email | Public |
 | POST | `/users/verify-otp` | Xác minh OTP | Public |
 | POST | `/users/reset-password` | Đặt lại mật khẩu sau khi verify OTP | Public |
@@ -303,10 +305,22 @@ Sau khi redirect thành công, FE gọi `POST /auth/refresh` để lấy access 
 3. FE gọi `POST /auth/refresh` để nhận access token từ cookie đã được set.
 4. User Google lần đầu (`profileCompleted = false`, chưa có password) phải hoàn tất **onboarding** qua `PATCH /users/complete-profile` trước khi dùng app.
 
-**Luồng quên mật khẩu (OTP):**
+**Luồng quên mật khẩu (OTP, public):**
 1. `POST /users/forgot-password` → gửi OTP qua email (lưu trong Redis).
 2. `POST /users/verify-otp` → xác minh OTP.
-3. `POST /users/reset-password` → đặt mật khẩu mới.
+3. `POST /users/reset-password` → đặt mật khẩu mới (revoke toàn bộ session cũ).
+
+**Luồng đổi mật khẩu trong app (OTP, authenticated):**
+1. `POST /users/me/change-password/init` (body `currentPassword`) → xác minh mật khẩu hiện tại; nếu đúng và **không vướng giới hạn 7 ngày** (`PASSWORD_CHANGE_LIMIT`) thì gửi OTP qua email.
+2. `POST /users/verify-otp` (dùng chung) → cổng xác minh OTP cho UI (không tiêu thụ OTP).
+3. `POST /users/me/change-password/confirm` (body `otpCode`, `newPassword`, `confirmPassword`) → re-validate khớp + độ mạnh (≥ Trung bình, length ≥ 8), xác minh lại OTP rồi đặt mật khẩu mới. **Giữ nguyên session hiện tại** (không revoke token).
+
+> Đổi mật khẩu dùng chung `OtpService` (Redis, OTP đã hash + TTL 90s) với luồng quên mật khẩu. Email OTP đổi mật khẩu có template riêng (`sendChangePasswordOtpEmail`, tông màu tím).
+
+**Xoá tài khoản (grace 30 ngày):**
+- `POST /users/me/deactivate-request` → set `status = PENDING_DELETE` + `deletionDate = now + 30 ngày`.
+- `POST /users/me/restore` → khôi phục về `ACTIVE`, xoá `deletionDate` (chỉ khi đang `PENDING_DELETE`).
+- `AccountDeletionScheduler` chạy lúc **00:00 mỗi ngày** (`0 0 0 * * *`), purge các tài khoản `PENDING_DELETE` đã quá hạn.
 
 ---
 

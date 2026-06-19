@@ -50,6 +50,7 @@ public class UserServiceImpl implements UserService {
     PasswordEncoder passwordEncoder;
 
     static SecureRandom SECURE_RANDOM = new SecureRandom();
+    static int PASSWORD_CHANGE_COOLDOWN_DAYS = 7;
 
     @Override
     public ApiResponse<UserResponse> registerUser(UserRegisterRequest request) {
@@ -146,7 +147,7 @@ public class UserServiceImpl implements UserService {
         if (user.getStatus() == UserStatus.LOCKED)
             throw new AppException(ErrorCode.USER_INACTIVE);
 
-        LocalDateTime deletionDate = LocalDateTime.now().plusMinutes(5);
+        LocalDateTime deletionDate = LocalDateTime.now().plusDays(30);
         user.setStatus(UserStatus.PENDING_DELETE);
         user.setDeletionDate(deletionDate);
         User savedUser = userRepository.save(user);
@@ -273,6 +274,62 @@ public class UserServiceImpl implements UserService {
 
         return ApiResponse.success("Đặt lại mật khẩu thành công");
     }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> initChangePassword(String email, ChangePasswordInitRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        // Người dùng phải có mật khẩu hiện tại để xác minh (Google user chưa onboarding sẽ không có).
+        if (user.getPassword() == null
+                || !passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new AppException(ErrorCode.PASSWORD_INCORRECT);
+        }
+
+        // Giới hạn tần suất: chỉ cho đổi mật khẩu 1 lần trong 7 ngày.
+        if (user.getLastPasswordChangeAt() != null
+                && user.getLastPasswordChangeAt().isAfter(
+                        LocalDateTime.now().minusDays(PASSWORD_CHANGE_COOLDOWN_DAYS))) {
+            throw new AppException(ErrorCode.PASSWORD_CHANGE_LIMIT);
+        }
+
+        String otpCode = generateOtp();
+        // Tái dùng OtpService (Redis, đã hash + TTL 90s) như luồng quên mật khẩu.
+        otpService.storeOtp(user.getEmail(), otpCode);
+        emailService.sendChangePasswordOtpEmail(user.getEmail(), otpCode, user.getFullName());
+
+        return ApiResponse.success("Mã OTP đổi mật khẩu đã được gửi đến email của bạn");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> confirmChangePassword(String email, ChangePasswordConfirmRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        // Không tin FE: xác thực lại khớp mật khẩu + độ mạnh ở phía server.
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new AppException(ErrorCode.PASSWORDS_NOT_MATCH);
+        }
+        if (request.getNewPassword().length() < 8
+                || passwordStrength(request.getNewPassword()) < MIN_PASSWORD_STRENGTH) {
+            throw new AppException(ErrorCode.WEAK_PASSWORD);
+        }
+
+        // Xác thực OTP (ném AppException nếu sai/hết hạn/vượt số lần thử).
+        otpService.verifyOtp(user.getEmail(), request.getOtpCode());
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setLastPasswordChangeAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        // OTP dùng một lần: xoá toàn bộ trạng thái OTP sau khi đổi thành công.
+        otpService.invalidate(user.getEmail());
+
+        return ApiResponse.success("Đổi mật khẩu thành công");
+    }
+
 
     private String generateOtp() {
         int otp = 100000 + SECURE_RANDOM.nextInt(900000);
