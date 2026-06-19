@@ -2,6 +2,7 @@ package su26.uml.be.service.Impl;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,15 +11,18 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import su26.uml.be.dto.request.DeleteProjectRequest;
 import su26.uml.be.dto.request.ProjectRequest;
 import su26.uml.be.dto.response.ApiResponse;
 import su26.uml.be.dto.response.ProjectResponse;
 import su26.uml.be.entity.Project;
+import su26.uml.be.entity.ProjectVersion;
 import su26.uml.be.entity.User;
 import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.mapper.ProjectMapper;
 import su26.uml.be.repository.ProjectRepository;
+import su26.uml.be.repository.ProjectVersionRepository;
 import su26.uml.be.repository.UserRepository;
 import su26.uml.be.service.ProjectService;
 
@@ -30,6 +34,7 @@ import su26.uml.be.service.ProjectService;
 public class ProjectServiceImpl implements ProjectService {
     ProjectRepository projectRepository;
     UserRepository userRepository;
+    ProjectVersionRepository projectVersionRepository;
     ProjectMapper projectMapper;
 
     @Override
@@ -61,12 +66,24 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    public ApiResponse<Void> deleteProject(UUID projectId, String email) {
-        Project project = getProjectAndValidateOwnership(projectId, email);
-        projectRepository.delete(project);
-
-        log.info("Project deleted: {} by user: {}", projectId, email);
-        return ApiResponse.success("Xóa dự án thành công");
+    public ApiResponse<Void> deleteProject(DeleteProjectRequest request, String email) {
+        List<Project> projects = projectRepository.findAllByIdIn(request.getIds());
+        
+        for (Project project : projects) {
+            if (!project.getUser().getEmail().equals(email)) {
+                throw new AppException(ErrorCode.PROJECT_ACCESS_DENIED);
+            }
+            
+            saveProjectVersion(project);
+            
+            project.setDeleted(true);
+            project.setUpdatedAt(LocalDateTime.now());
+        }
+        
+        projectRepository.saveAll(projects);
+        
+        log.info("Bulk soft-deleted {} projects by user: {}", projects.size(), email);
+        return ApiResponse.success("Xóa các dự án thành công");
     }
 
     @Override
@@ -80,7 +97,7 @@ public class ProjectServiceImpl implements ProjectService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
-        List<Project> projects = projectRepository.findAllByUser(user);
+        List<Project> projects = projectRepository.findAllByUserAndIsDeletedFalse(user);
         return ApiResponse.success("Lấy danh sách dự án thành công", projectMapper.toProjectResponseList(projects));
     }
 
@@ -88,9 +105,27 @@ public class ProjectServiceImpl implements ProjectService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
 
+        if (project.isDeleted()) {
+            throw new AppException(ErrorCode.PROJECT_NOT_FOUND);
+        }
+
         if (!project.getUser().getEmail().equals(email)) {
             throw new AppException(ErrorCode.PROJECT_ACCESS_DENIED);
         }
         return project;
+    }
+
+    private void saveProjectVersion(Project project) {
+        Integer lastVersion = projectVersionRepository.findFirstByProjectOrderByVersionNumberDesc(project)
+                .map(ProjectVersion::getVersionNumber)
+                .orElse(0);
+
+        ProjectVersion version = ProjectVersion.builder()
+                .project(project)
+                .projectSnapshot(project.getProjectData())
+                .versionNumber(lastVersion + 1)
+                .build();
+        
+        projectVersionRepository.save(version);
     }
 }

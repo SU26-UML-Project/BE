@@ -27,4 +27,8 @@ public class Project extends BaseEntity {
 
     @Column(name = "project_data", columnDefinition = "TEXT")
     String projectData;
+
+    @Column(name = "is_deleted")
+    @Builder.Default
+    boolean isDeleted = false;
 }

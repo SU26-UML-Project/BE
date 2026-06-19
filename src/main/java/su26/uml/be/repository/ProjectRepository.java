@@ -10,5 +10,6 @@ import java.util.UUID;
 
 @Repository
 public interface ProjectRepository extends JpaRepository<Project, UUID> {
-    List<Project> findAllByUser(User user);
+    List<Project> findAllByUserAndIsDeletedFalse(User user);
+    List<Project> findAllByIdIn(List<UUID> ids);
 }

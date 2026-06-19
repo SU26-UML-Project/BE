@@ -9,6 +9,7 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import su26.uml.be.dto.request.DeleteProjectRequest;
 import su26.uml.be.dto.request.ProjectRequest;
 import su26.uml.be.dto.response.ApiResponse;
 import su26.uml.be.dto.response.ProjectResponse;
@@ -56,11 +57,11 @@ public class ProjectController {
         return projectService.updateProject(projectId, userDetails.getUsername(), request);
     }
 
-    @DeleteMapping("/{projectId}")
-    @Operation(summary = "Delete project", description = "Deletes a project and all its sheets.")
+    @DeleteMapping
+    @Operation(summary = "Delete projects", description = "Soft-deletes one or multiple projects and saves version snapshots.")
     public ApiResponse<Void> deleteProject(
             @AuthenticationPrincipal UserDetails userDetails,
-            @PathVariable UUID projectId) {
-        return projectService.deleteProject(projectId, userDetails.getUsername());
+            @Valid @RequestBody DeleteProjectRequest request) {
+        return projectService.deleteProject(request, userDetails.getUsername());
     }
 }
