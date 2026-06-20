@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -35,7 +36,8 @@ public class UserResponse {
     @Schema(description = "Date of birth.", example = "2000-01-15")
     LocalDate dob;
 
-    @Schema(description = "Hashed password (BCrypt).", accessMode = Schema.AccessMode.READ_ONLY)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @Schema(description = "Hashed password (BCrypt). Never serialized in responses.", hidden = true)
     String password;
 
     @Schema(description = "Account status.", example = "ACTIVE", allowableValues = {"ACTIVE", "LOCKED", "PENDING_DELETE"})

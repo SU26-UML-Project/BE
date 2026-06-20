@@ -7,8 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import su26.uml.be.dto.request.UpdateUserRequest;
-import su26.uml.be.dto.request.UserRegisterRequest;
+import su26.uml.be.dto.request.*;
 import su26.uml.be.enums.UserStatus;
 import su26.uml.be.dto.response.ApiResponse;
 import su26.uml.be.dto.response.DeleteAccountResponse;
@@ -16,7 +15,6 @@ import su26.uml.be.dto.response.MeResponse;
 import su26.uml.be.dto.response.UserResponse;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import su26.uml.be.entity.Role;
 import su26.uml.be.entity.User;
 import su26.uml.be.exception.AppException;
@@ -24,9 +22,13 @@ import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.mapper.UserMapper;
 import su26.uml.be.repository.RoleRepository;
 import su26.uml.be.repository.UserRepository;
+import su26.uml.be.service.EmailService;
+import su26.uml.be.service.OtpService;
+import su26.uml.be.service.RefreshTokenService;
 import su26.uml.be.service.UserService;
 
 
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,9 +41,16 @@ public class UserServiceImpl implements UserService {
     UserRepository userRepository;
     RoleRepository roleRepository;
 
+    EmailService emailService;
+    OtpService otpService;
+    RefreshTokenService refreshTokenService;
+
     UserMapper userMapper;
 
     PasswordEncoder passwordEncoder;
+
+    static SecureRandom SECURE_RANDOM = new SecureRandom();
+    static int PASSWORD_CHANGE_COOLDOWN_DAYS = 7;
 
     @Override
     public ApiResponse<UserResponse> registerUser(UserRegisterRequest request) {
@@ -56,6 +65,7 @@ public class UserServiceImpl implements UserService {
         user.setRole(role);
 
         user.setStatus(UserStatus.ACTIVE);
+        user.setProfileCompleted(true); // tài khoản đăng ký thường đã có đủ thông tin
         User savedUser = userRepository.save(user);
 
         UserResponse userResponse = userMapper.toUserResponse(savedUser);
@@ -75,6 +85,58 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public ApiResponse<UserResponse> completeProfile(String email, CompleteProfileRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        // Onboarding is one-time only: refuse if the profile is already completed.
+        if (Boolean.TRUE.equals(user.getProfileCompleted())) {
+            throw new AppException(ErrorCode.PROFILE_ALREADY_COMPLETED);
+        }
+
+        // Never trust the FE: re-validate password match + strength on the server.
+        if (!request.getPassword().equals(request.getConfirmPassword())) {
+            throw new AppException(ErrorCode.PASSWORDS_NOT_MATCH);
+        }
+        if (passwordStrength(request.getPassword()) < MIN_PASSWORD_STRENGTH) {
+            throw new AppException(ErrorCode.WEAK_PASSWORD);
+        }
+
+        userMapper.completeProfile(request, user);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setLastPasswordChangeAt(LocalDateTime.now());
+        user.setProfileCompleted(true); // đánh dấu đã hoàn tất onboarding
+        User savedUser = userRepository.save(user);
+
+        // Confirmation email — never includes the plaintext password.
+        try {
+            emailService.sendAccountSetupSuccessEmail(
+                    savedUser.getEmail(), savedUser.getFullName(), savedUser.getLastPasswordChangeAt());
+        } catch (Exception e) {
+            // Email is best-effort: onboarding must still succeed if SMTP hiccups.
+            log.warn("Không thể gửi email xác nhận thiết lập tài khoản cho {}: {}", savedUser.getEmail(), e.getMessage());
+        }
+
+        return ApiResponse.success("Đã lưu thông tin, email xác nhận đã được gửi",
+                userMapper.toUserResponse(savedUser));
+    }
+
+    // Minimum acceptable strength = "Trung bình" (3 of 5 criteria), matching the FE meter.
+    private static final int MIN_PASSWORD_STRENGTH = 3;
+
+    /** Count satisfied criteria: length>=8, uppercase, lowercase, digit, special char. */
+    private int passwordStrength(String pw) {
+        if (pw == null) return 0;
+        int score = 0;
+        if (pw.length() >= 8) score++;
+        if (pw.matches(".*[A-Z].*")) score++;
+        if (pw.matches(".*[a-z].*")) score++;
+        if (pw.matches(".*\\d.*")) score++;
+        if (pw.matches(".*[^A-Za-z0-9].*")) score++;
+        return score;
+    }
+
+    @Override
     public ApiResponse<DeleteAccountResponse> requestDeleteAccount(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
@@ -85,18 +147,14 @@ public class UserServiceImpl implements UserService {
         if (user.getStatus() == UserStatus.LOCKED)
             throw new AppException(ErrorCode.USER_INACTIVE);
 
-        LocalDateTime deletionDate = LocalDateTime.now().plusMinutes(5);
+        LocalDateTime deletionDate = LocalDateTime.now().plusDays(30);
         user.setStatus(UserStatus.PENDING_DELETE);
         user.setDeletionDate(deletionDate);
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
         return ApiResponse.success("Yêu cầu xóa tài khoản đã được ghi nhận",
-                DeleteAccountResponse.builder()
-                        .status(UserStatus.PENDING_DELETE.name())
-                        .deletionDate(deletionDate)
-                        .daysRemaining(30L)
-                        .message("Tài khoản sẽ bị xóa vĩnh viễn sau 30 ngày. Bạn có thể khôi phục trước thời hạn này.")
-                        .build());
+                userMapper.toDeleteAccountResponse(savedUser, 30L,
+                        "Tài khoản sẽ bị xóa vĩnh viễn sau 30 ngày. Bạn có thể khôi phục trước thời hạn này."));
     }
 
     @Override
@@ -109,16 +167,15 @@ public class UserServiceImpl implements UserService {
 
         user.setStatus(UserStatus.ACTIVE);
         user.setDeletionDate(null);
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
         return ApiResponse.success("Tài khoản đã được khôi phục thành công",
-                DeleteAccountResponse.builder()
-                        .status(UserStatus.ACTIVE.name())
-                        .message("Tài khoản của bạn đã được khôi phục và hoạt động bình thường.")
-                        .build());
+                userMapper.toDeleteAccountResponse(savedUser, null,
+                        "Tài khoản của bạn đã được khôi phục và hoạt động bình thường."));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ApiResponse<List<UserResponse>> getAllUsers() {
         List<User> users = userRepository.findAll();
 
@@ -132,6 +189,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ApiResponse<UserResponse> getUserById(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
@@ -150,5 +208,131 @@ public class UserServiceImpl implements UserService {
         MeResponse meResponse = userMapper.toMeResponse(user);
 
         return ApiResponse.success("Lấy thông tin người dùng hiện tại thành công", meResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<UserResponse> getMyProfile(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        UserResponse userResponse = userMapper.toUserResponse(user);
+
+        return ApiResponse.success("Lấy hồ sơ cá nhân thành công", userResponse);
+    }
+
+    @Override
+    public ApiResponse<String> forgotPassword(ForgotPasswordRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+
+        String otpCode = generateOtp();
+
+        // Lưu OTP (đã hash) trong Redis kèm TTL — thay cho bảng password_reset_tokens.
+        otpService.storeOtp(user.getEmail(), otpCode);
+        emailService.sendForgotPasswordOtpEmail(user.getEmail(), otpCode, user.getFullName());
+        return ApiResponse.success("Mã OTP đã được gửi đến email của bạn", null);
+    }
+
+    @Override
+    public ApiResponse<String> verifyOtp(VerifyOtpRequest request) {
+        userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+
+        // Ném AppException nếu OTP sai/hết hạn/vượt số lần thử.
+        otpService.verifyOtp(request.getEmail(), request.getOtpCode());
+        otpService.markVerified(request.getEmail());
+
+        return ApiResponse.success("Mã OTP hợp lệ");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> resetPassword(ResetPasswordRequest request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new AppException(ErrorCode.PASSWORDS_NOT_MATCH);
+        }
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+
+        // Chỉ cho đổi mật khẩu khi OTP đã được verify ở bước trước (cờ ngắn hạn trong Redis).
+        if (!otpService.isVerified(request.getEmail())) {
+            throw new AppException(ErrorCode.OTP_NOT_VERIFIED);
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setLastPasswordChangeAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        // OTP dùng một lần: xoá toàn bộ trạng thái OTP sau khi đổi thành công.
+        otpService.invalidate(request.getEmail());
+
+        // Vô hiệu hoá mọi phiên đăng nhập cũ sau khi đổi mật khẩu.
+        refreshTokenService.revokeAllTokens(user.getId().toString());
+        refreshTokenService.setLogoutTime(user.getEmail());
+
+        return ApiResponse.success("Đặt lại mật khẩu thành công");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> initChangePassword(String email, ChangePasswordInitRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        // Người dùng phải có mật khẩu hiện tại để xác minh (Google user chưa onboarding sẽ không có).
+        if (user.getPassword() == null
+                || !passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new AppException(ErrorCode.PASSWORD_INCORRECT);
+        }
+
+        // Giới hạn tần suất: chỉ cho đổi mật khẩu 1 lần trong 7 ngày.
+        if (user.getLastPasswordChangeAt() != null
+                && user.getLastPasswordChangeAt().isAfter(
+                        LocalDateTime.now().minusDays(PASSWORD_CHANGE_COOLDOWN_DAYS))) {
+            throw new AppException(ErrorCode.PASSWORD_CHANGE_LIMIT);
+        }
+
+        String otpCode = generateOtp();
+        // Tái dùng OtpService (Redis, đã hash + TTL 90s) như luồng quên mật khẩu.
+        otpService.storeOtp(user.getEmail(), otpCode);
+        emailService.sendChangePasswordOtpEmail(user.getEmail(), otpCode, user.getFullName());
+
+        return ApiResponse.success("Mã OTP đổi mật khẩu đã được gửi đến email của bạn");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> confirmChangePassword(String email, ChangePasswordConfirmRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        // Không tin FE: xác thực lại khớp mật khẩu + độ mạnh ở phía server.
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new AppException(ErrorCode.PASSWORDS_NOT_MATCH);
+        }
+        if (request.getNewPassword().length() < 8
+                || passwordStrength(request.getNewPassword()) < MIN_PASSWORD_STRENGTH) {
+            throw new AppException(ErrorCode.WEAK_PASSWORD);
+        }
+
+        // Xác thực OTP (ném AppException nếu sai/hết hạn/vượt số lần thử).
+        otpService.verifyOtp(user.getEmail(), request.getOtpCode());
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setLastPasswordChangeAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        // OTP dùng một lần: xoá toàn bộ trạng thái OTP sau khi đổi thành công.
+        otpService.invalidate(user.getEmail());
+
+        return ApiResponse.success("Đổi mật khẩu thành công");
+    }
+
+
+    private String generateOtp() {
+        int otp = 100000 + SECURE_RANDOM.nextInt(900000);
+        return String.valueOf(otp);
     }
 }

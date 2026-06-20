@@ -16,8 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import su26.uml.be.config.swagger.SwaggerExamples;
-import su26.uml.be.dto.request.UpdateUserRequest;
-import su26.uml.be.dto.request.UserRegisterRequest;
+import su26.uml.be.dto.request.*;
 import su26.uml.be.dto.response.DeleteAccountResponse;
 import su26.uml.be.dto.response.MeResponse;
 import su26.uml.be.dto.response.UserResponse;
@@ -91,6 +90,27 @@ public class UserController {
         return userService.updateMe(userDetails.getUsername(), request);
     }
 
+    @PatchMapping("/complete-profile")
+    @Operation(
+            summary = "Complete first-time onboarding (OAuth2 users)",
+            description = "One-time onboarding for a Google user who has not finished their profile yet. " +
+                    "Sets fullName, phone, dob and a self-chosen password (BCrypt-hashed), marks the profile as " +
+                    "completed (password becomes non-null), and emails a setup-success confirmation (never the password). " +
+                    "Requires a valid access token and fails with PROFILE_ALREADY_COMPLETED if the profile is already done."
+    )
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(schema = @Schema(implementation = CompleteProfileRequest.class),
+                    examples = @ExampleObject(value = SwaggerExamples.COMPLETE_PROFILE_REQUEST)))
+    @ApiResponse(responseCode = "200", description = "Onboarding completed; confirmation email sent.",
+            content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
+                    examples = @ExampleObject(value = SwaggerExamples.COMPLETE_PROFILE_RESPONSE)))
+    @ApiResponse(responseCode = "400", description = "Profile already completed, weak password, or passwords do not match.")
+    public su26.uml.be.dto.response.ApiResponse<UserResponse> completeProfile(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody CompleteProfileRequest request) {
+        return userService.completeProfile(userDetails.getUsername(), request);
+    }
+
     @PostMapping("/me/deactivate-request")
     @Operation(
             summary = "Request account deletion (30-day grace period)",
@@ -134,5 +154,101 @@ public class UserController {
     public su26.uml.be.dto.response.ApiResponse<MeResponse> getCurrentUser(
             @AuthenticationPrincipal UserDetails userDetails) {
         return userService.getCurrentUser(userDetails.getUsername());
+    }
+
+    @GetMapping("/me/profile")
+    @Operation(
+            summary = "Get the current user's full profile",
+            description = "Returns the complete profile (fullName, phone, dob, avatarUrl, status, createdAt, role, ...) " +
+                    "of the authenticated user resolved from the JWT. Unlike GET /users/me (lightweight identity), " +
+                    "this is intended for the profile page."
+    )
+    @ApiResponse(responseCode = "200", description = "Profile returned.")
+    public su26.uml.be.dto.response.ApiResponse<UserResponse> getMyProfile(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return userService.getMyProfile(userDetails.getUsername());
+    }
+
+    //reset password
+    @PostMapping("/forgot-password")
+    @SecurityRequirements({})
+    @Operation(
+            summary = "Request a password-reset OTP",
+            description = "Validates the email exists, invalidates any previous reset tokens, generates a 6-digit OTP " +
+                    "valid for 1 minute 30 seconds, and emails it to the user. Returns 404 if the email is not registered."
+    )
+    @ApiResponse(responseCode = "200", description = "OTP sent to the user's email.")
+    @ApiResponse(responseCode = "404", description = "Email not found.")
+    public su26.uml.be.dto.response.ApiResponse<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return userService.forgotPassword(request);
+    }
+
+    @PostMapping("/verify-otp")
+    @SecurityRequirements({})
+    @Operation(
+            summary = "Verify a password-reset OTP",
+            description = "Checks that the OTP matches the email, has not been used, and has not expired. " +
+                    "Does not consume the OTP — it is consumed only on POST /users/reset-password."
+    )
+    @ApiResponse(responseCode = "200", description = "OTP is valid.")
+    @ApiResponse(responseCode = "400", description = "OTP is invalid, used, or expired.")
+    public su26.uml.be.dto.response.ApiResponse<String> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        return userService.verifyOtp(request);
+    }
+
+    @PostMapping("/reset-password")
+    @SecurityRequirements({})
+    @Operation(
+            summary = "Reset password with a verified OTP",
+            description = "Re-validates the OTP, ensures newPassword equals confirmPassword, updates the user's password " +
+                    "(BCrypt), and marks the OTP as used so it cannot be reused."
+    )
+    @ApiResponse(responseCode = "200", description = "Password reset successfully.")
+    @ApiResponse(responseCode = "400", description = "OTP invalid/expired/used or passwords do not match.")
+    public su26.uml.be.dto.response.ApiResponse<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return userService.resetPassword(request);
+    }
+
+    // change password (authenticated, in-app, OTP-protected)
+    @PostMapping("/me/change-password/init")
+    @Operation(
+            summary = "Start an in-app password change (step 1)",
+            description = "For the authenticated user: verifies the current password and, if correct, emails a 6-digit OTP " +
+                    "valid for 2 minutes. Enforces a 7-day cool-down between password changes. " +
+                    "Fails with PASSWORD_INCORRECT (1070) if the current password is wrong and PASSWORD_CHANGE_LIMIT (1071) " +
+                    "if a change was already made within the last 7 days."
+    )
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(schema = @Schema(implementation = ChangePasswordInitRequest.class),
+                    examples = @ExampleObject(value = SwaggerExamples.CHANGE_PASSWORD_INIT_REQUEST)))
+    @ApiResponse(responseCode = "200", description = "OTP sent to the user's email.",
+            content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
+                    examples = @ExampleObject(value = SwaggerExamples.CHANGE_PASSWORD_INIT_RESPONSE)))
+    @ApiResponse(responseCode = "400", description = "Current password incorrect or 7-day change limit reached.")
+    public su26.uml.be.dto.response.ApiResponse<String> initChangePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody ChangePasswordInitRequest request) {
+        return userService.initChangePassword(userDetails.getUsername(), request);
+    }
+
+    @PostMapping("/me/change-password/confirm")
+    @Operation(
+            summary = "Confirm an in-app password change (step 2)",
+            description = "For the authenticated user: validates the OTP, ensures newPassword equals confirmPassword and meets " +
+                    "the strength rule (≥ Medium, length ≥ 8), then updates the password (BCrypt) and consumes the OTP. " +
+                    "The current session stays logged in. Fails with WEAK_PASSWORD (1074), PASSWORDS_NOT_MATCH (1065), " +
+                    "or an OTP error if the code is invalid/expired."
+    )
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(schema = @Schema(implementation = ChangePasswordConfirmRequest.class),
+                    examples = @ExampleObject(value = SwaggerExamples.CHANGE_PASSWORD_CONFIRM_REQUEST)))
+    @ApiResponse(responseCode = "200", description = "Password changed successfully.",
+            content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
+                    examples = @ExampleObject(value = SwaggerExamples.CHANGE_PASSWORD_CONFIRM_RESPONSE)))
+    @ApiResponse(responseCode = "400", description = "OTP invalid/expired, weak password, or passwords do not match.")
+    public su26.uml.be.dto.response.ApiResponse<String> confirmChangePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody ChangePasswordConfirmRequest request) {
+        return userService.confirmChangePassword(userDetails.getUsername(), request);
     }
 }

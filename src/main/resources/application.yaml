@@ -11,7 +11,7 @@ spring:
     import: optional:file:BE/.env[.properties]
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -46,6 +46,25 @@ spring:
   jackson:
     time-zone: ${APP_TIMEZONE}
 
+  servlet:
+    multipart:
+      # Cho phép PDF tới 10MB lọt qua tới tầng service để chính validate của ta trả lỗi thân thiện.
+      # Đặt cao hơn 10MB một chút để ngưỡng FILE_TOO_LARGE (10MB) là người gác cổng thực sự.
+      max-file-size: 11MB
+      max-request-size: 12MB
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   security:
     oauth2:
       client:
@@ -68,7 +87,26 @@ jwt:
   accessTokenExpiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600}
   refreshTokenExpiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800}
 
+supabase:
+  # URL dự án Supabase, ví dụ https://xyz.supabase.co
+  url: ${SUPABASE_URL}
+  # Anon key (public) — không dùng ở backend, giữ để tham chiếu/đầy đủ cấu hình.
+  anon-key: ${SUPABASE_ANON_KEY:}
+  # service_role key — toàn quyền Storage, CHỈ dùng ở backend, KHÔNG lộ ra frontend.
+  service-key: ${SUPABASE_SERVICE_KEY}
+
+otp:
+  # Thời gian sống của OTP đặt lại mật khẩu (giây).
+  ttl-seconds: ${OTP_TTL_SECONDS:90}
+  # Số lần nhập sai tối đa trước khi OTP bị vô hiệu hoá (chống brute-force).
+  max-attempts: ${OTP_MAX_ATTEMPTS:5}
+  # Thời gian giữ cờ "đã verify OTP" để cho phép đặt lại mật khẩu (giây).
+  verified-ttl-seconds: ${OTP_VERIFIED_TTL_SECONDS:300}
+
 app:
+  frontend:
+    # Trang chủ FE — dùng cho liên kết "quên mật khẩu" trong email xác nhận thiết lập tài khoản.
+    base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   oauth2:
     frontend-callback-url: ${FRONTEND_CALLBACK_URL}
   auth:

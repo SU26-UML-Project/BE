@@ -43,6 +43,7 @@ BE/
     ├── config/
     │   ├── RedisConfig.java                 — RedisTemplate<String,String> bean
     │   ├── TimezoneVerificationConfig.java  — Timezone setup on startup
+    │   ├── AccountDeletionScheduler.java    — @Scheduled(cron "0 0 0 * * *") daily purge of PENDING_DELETE accounts past deletionDate
     │   ├── TokenCleanupTask.java            — @Deprecated/DISABLED (commented out); refresh tokens now expire via Redis TTL
     │   ├── security/                        — ONLY legacy DISABLED files remain here (kept untouched for rollback)
     │   │   ├── CustomJwtDecoder.java        — @Deprecated/DISABLED (commented out); old OAuth2 Resource Server JwtDecoder
@@ -61,7 +62,12 @@ BE/
     │   └── OAuth2AuthenticationSuccessHandler.java — issue JWT, set refresh cookie, redirect FE
     ├── controller/
     │   ├── AuthenticationController.java    — POST /auth/{login,refresh,introspect,logout}, GET /auth/account-status
-    │   └── UserController.java              — POST /users/register
+    │   ├── UserController.java              — /users: register, GET/PATCH me, me/profile, complete-profile (onboarding),
+    │   │                                       me/deactivate-request, me/restore, me/change-password/{init,confirm} (authenticated),
+    │   │                                       forgot-password, verify-otp, reset-password,
+    │   │                                       GET (list, ADMIN), GET /{userId} (ADMIN)
+    │   ├── AdminController.java             — Admin-only user management (@PreAuthorize ROLE_ADMIN)
+    │   └── FileController.java              — /files: POST avatar, POST documents, GET documents/signed-url (Supabase Storage)
     ├── dto/
     │   ├── request/
     │   │   ├── LoginRequest.java
@@ -69,12 +75,20 @@ BE/
     │   │   ├── IntrospectRequest.java
     │   │   ├── LogoutRequest.java           — body optional (access token blacklist only)
     │   │   ├── UserRegisterRequest.java
+    │   │   ├── UpdateUserRequest.java       — partial profile update (fullName, phone, dob, avatarUrl)
+    │   │   ├── CompleteProfileRequest.java  — onboarding: fullName, phone, dob, password, confirmPassword
+    │   │   ├── ForgotPasswordRequest / VerifyOtpRequest / ResetPasswordRequest — OTP reset flow
+    │   │   ├── OAuth2UserInfo.java          — internal carrier for Google profile → User mapping
     │   │   └── UserRequest.java
     │   └── response/
     │       ├── ApiResponse.java             — Universal response envelope {code, message, result}
     │       ├── AuthenticationResponse.java  — {token, authenticated}; refreshToken omitted from body
     │       ├── IntrospectResponse.java      — {valid}
-    │       └── UserResponse.java            — User details + nested RoleResponse
+    │       ├── MeResponse.java              — lightweight identity {id, email, role, avatarUrl, profileCompleted}
+    │       ├── UserResponse.java            — full User details + nested RoleResponse
+    │       ├── DeleteAccountResponse.java   — status + deletionDate + daysRemaining + message
+    │       ├── FileUploadResponse.java      — {bucket, path, url} for Supabase uploads
+    │       └── SignedUrlResponse.java       — {signedUrl, expiresInSeconds}
     ├── entity/
     │   ├── User.java                        — @Table("users"), UUID PK; password + phone nullable (Google users); fields: provider, googleId
     │   ├── Role.java                        — @Table("roles"), UUID PK, 1:N to User
@@ -85,7 +99,10 @@ BE/
     │   ├── ErrorCode.java                   — Enum: code (int) + message (String) + HttpStatus
     │   └── GlobalExceptionHandler.java      — @ControllerAdvice; handles AppException, validation, AccessDenied, catch-all Exception (NOTE: no AuthenticationException/JwtException handler → auth failures currently fall through to 500)
     ├── mapper/
-    │   └── UserMapper.java                  — MapStruct: UserRegisterRequest→User, User→UserResponse
+    │   ├── UserMapper.java                  — MapStruct: UserRegisterRequest→User, User→{UserResponse, MeResponse},
+    │   │                                       updateUser/completeProfile (@MappingTarget), toDeleteAccountResponse.
+    │   │                                       MeResponse.profileCompleted maps from User.profile_completed (see §4 onboarding)
+    │   └── OAuth2UserMapper.java            — MapStruct: OAuth2UserInfo→User, updateGoogleFields (@MappingTarget)
     ├── repository/
     │   ├── UserRepository.java
     │   ├── RoleRepository.java              — + findByRoleName(String)
@@ -96,17 +113,30 @@ BE/
         ├── TokenBlacklistService.java       — Interface: Redis-backed ACCESS token blacklist
         ├── JwtService.java                  — Interface: generate (HS512) + parseClaims (verify signature + expiry)
         ├── RefreshTokenService.java         — Interface: REFRESH token JTI tracking in Redis (rt:{jti}, user_rt:{userId}, logout_time:{email})
-        ├── UserService.java                 — Interface
+        ├── UserService.java                 — Interface (register, updateMe, completeProfile, profile/me, delete/restore, OTP reset)
         ├── CustomOAuth2UserService.java     — Interface: Google profile → find/create User
+        ├── EmailService.java                — Interface: OTP emails + account-setup-success email (HTML, branded, VN)
+        ├── OtpService.java                  — Interface: Redis OTP storage/verify for password reset
+        ├── SupabaseStorageService.java      — Interface: upload avatar/document, signed URLs (Supabase Storage REST)
         └── Impl/
             ├── AuthenticationServiceImpl.java
             ├── TokenBlacklistServiceImpl.java
             ├── JwtServiceImpl.java          — Nimbus JOSE implementation of JwtService
             ├── RefreshTokenServiceImpl.java — Redis (StringRedisTemplate) implementation of RefreshTokenService
             ├── UserDetailsServiceImpl.java  — Spring UserDetailsService: load user by email (no custom interface)
-            ├── CustomOAuth2UserServiceImpl.java
+            ├── CustomOAuth2UserServiceImpl.java — THE active Google-user creator (password=null for fresh users)
+            ├── EmailServiceImpl.java        — JavaMailSender; HTML templates; never emails plaintext passwords
+            ├── OtpServiceImpl.java
+            ├── SupabaseStorageServiceImpl.java
             └── UserServiceImpl.java
 ```
+
+> **Note — `FileController` layering deviation:** unlike the other controllers (which are thin
+> and delegate entirely to a `*Service`), `FileController` injects `UserRepository` directly and
+> contains business logic (`currentUserId()` lookup, `pathFromPublicUrl()` URL parsing, and
+> hand-built `FileUploadResponse`/`SignedUrlResponse` via `.builder()`). This is a known
+> inconsistency with Rule 12/18 — see §7. Prefer moving identity resolution + response assembly
+> into `SupabaseStorageService` for new file features.
 
 ---
 
@@ -224,6 +254,43 @@ There is **no SHA-256 hash, no DB row, and no token family** — rotation works 
 5. `OAuth2AuthenticationFailureHandler`: redirects FE to `FRONTEND_CALLBACK_URL?error=<message>`.
 6. FE must call `POST /auth/refresh` to get the access token after redirect.
 
+### Onboarding (first-time Google users) — `PATCH /users/complete-profile` (authenticated)
+A fresh Google user is created with **no real password** (`CustomOAuth2UserServiceImpl` sets
+`password = null`; the dead fallback in `OAuth2AuthenticationSuccessHandler` historically wrote the
+placeholder `"GOOGLE_OAUTH2_USER"`). They must finish a one-time onboarding before using the app.
+
+- **Completion flag — explicit `User.profile_completed` BOOLEAN column** (source of truth; mapped
+  straight onto `MeResponse.profileCompleted`). Set explicitly everywhere a user is created:
+  register/admin → `true`; fresh Google user (`CustomOAuth2UserServiceImpl`, and the success-handler
+  fallback) → `false`; onboarding completion → `true`. The FE gates on `MeResponse.profileCompleted`
+  (GET `/users/me`): `=== false` → onboarding wizard, otherwise → app. Legacy rows are backfilled
+  once on startup (`DataInitializer`, keyed on `provider`/`lastPasswordChangeAt`, NOT password —
+  fresh Google users may carry a random BCrypt hash so the password is not a reliable signal).
+- **Endpoint:** `UserServiceImpl.completeProfile(email, CompleteProfileRequest)`:
+  1. `findByEmail` → `USER_NOT_EXISTED`.
+  2. Guard one-time: if `Boolean.TRUE.equals(user.getProfileCompleted())` → `PROFILE_ALREADY_COMPLETED`.
+  3. Re-validate server-side (never trust FE): `password == confirmPassword` else `PASSWORDS_NOT_MATCH`;
+     password strength ≥ **medium** (≥3 of {len≥8, upper, lower, digit, special}) **and** length ≥ 8 else `WEAK_PASSWORD`.
+  4. `userMapper.completeProfile(...)` maps fullName/phone/dob; service sets BCrypt password + `lastPasswordChangeAt` + `profileCompleted = true`.
+  5. Best-effort `EmailService.sendAccountSetupSuccessEmail` (try/catch, logged — onboarding still succeeds if SMTP fails).
+     The email **never** contains the plaintext password — only a confirmation + a "forgot password" link (`app.frontend.base-url`).
+  6. Returns `UserResponse`.
+- **New ErrorCodes:** `WEAK_PASSWORD` (1074), `PROFILE_ALREADY_COMPLETED` (1075), `DOB_REQUIRED` (1076).
+
+### Change password (in-app, authenticated) — `POST /users/me/change-password/{init,confirm}`
+Đổi mật khẩu khi **đang đăng nhập** (khác với forgot/reset là public). Hai bước, bảo vệ bằng OTP, dùng chung `OtpService` (Redis, OTP hash + TTL 90s) và email template riêng `sendChangePasswordOtpEmail`.
+1. **`initChangePassword(email, ChangePasswordInitRequest)`** (`UserServiceImpl`):
+   - `findByEmail` → `USER_NOT_EXISTED`.
+   - Xác minh mật khẩu hiện tại: `password == null` (Google user chưa onboarding) hoặc `!passwordEncoder.matches(...)` → `PASSWORD_INCORRECT` (1070).
+   - **Giới hạn 7 ngày:** nếu `lastPasswordChangeAt` nằm trong 7 ngày gần nhất → `PASSWORD_CHANGE_LIMIT` (1071).
+   - Sinh OTP → `otpService.storeOtp(email, otp)` → `emailService.sendChangePasswordOtpEmail(...)`. Trả `ApiResponse<String>`.
+2. **Cổng OTP cho UI:** FE gọi lại `POST /users/verify-otp` (public, không tiêu thụ OTP) để mở bước nhập mật khẩu mới — không cần endpoint riêng.
+3. **`confirmChangePassword(email, ChangePasswordConfirmRequest)`** (`UserServiceImpl`):
+   - `findByEmail`; re-validate `newPassword == confirmPassword` → `PASSWORDS_NOT_MATCH`; độ mạnh ≥ `MIN_PASSWORD_STRENGTH` (3) **và** length ≥ 8 → `WEAK_PASSWORD`.
+   - `otpService.verifyOtp(email, otpCode)` (ném khi sai/hết hạn/quá số lần) → set BCrypt password + `lastPasswordChangeAt` → `otpService.invalidate(email)`.
+   - **Giữ session hiện tại — KHÔNG revoke token** (chủ ý: đổi mật khẩu ngay trong app không nên đá user ra). Khác với `resetPassword` (public) có `revokeAllTokens` + `setLogoutTime`.
+   - DTO `ChangePasswordInitRequest`/`ChangePasswordConfirmRequest` theo convention chung (`@Data @Builder @AllArgsConstructor @NoArgsConstructor @FieldDefaults`, message = ErrorCode key).
+
 ### Refresh — `POST /auth/refresh` (public)
 1. Read refresh JWT from HttpOnly cookie (`AUTH_COOKIE_NAME`) → `UNAUTHENTICATED` if missing.
 2. `JwtService.parseClaims` (verify signature + expiry) and check `typ == "refresh"`.
@@ -303,12 +370,19 @@ Run both via Docker: `docker compose up -d`.
 | `provider` | VARCHAR(20) | nullable; `"google"` for OAuth2 users |
 | `google_id` | VARCHAR | unique, nullable |
 | `role_id` | UUID (FK→roles) | not null |
-| `status` | VARCHAR | `"ACTIVE"` or `"LOCKED"` |
+| `status` | VARCHAR | `UserStatus` enum: `ACTIVE`, `LOCKED`, `PENDING_DELETE` |
+| `deletion_date` | TIMESTAMP | nullable; set when status = `PENDING_DELETE` (30-day grace) |
 | `avatar_url` | VARCHAR(500) | nullable |
+| `dob` | DATE | nullable (date of birth) |
 | `last_active_at` | TIMESTAMP | nullable |
-| `last_password_change_at` | TIMESTAMP | nullable |
+| `last_password_change_at` | TIMESTAMP | nullable; set on password set/change/onboarding |
+| `profile_completed` | BOOLEAN | nullable in DB; `true` for normal-register/admin/onboarded users, `false` for fresh Google users who must onboard (see §4 Onboarding) |
 | `created_at` | TIMESTAMP | `@CreationTimestamp`, not updatable |
 | `updated_at` | TIMESTAMP | `@UpdateTimestamp` |
+
+> `profile_completed` is set explicitly on every creation path (register/admin → `true`,
+> fresh Google user → `false`, onboarding → `true`). Rows created before the column existed are
+> backfilled once on startup by `DataInitializer.backfillProfileCompleted()`.
 
 **`roles` table — `Role.java`**
 | Column | Type | Notes |
@@ -374,7 +448,10 @@ DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD
 APP_TIMEZONE, JWT_SIGNER_KEY
 GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 FRONTEND_CALLBACK_URL          # e.g. http://localhost:5173/auth/google/callback
+MAIL_USERNAME, MAIL_PASSWORD   # Gmail SMTP (spring.mail) — OTP + account-setup emails
+SUPABASE_URL, SUPABASE_SERVICE_KEY  # Supabase Storage (service_role key, backend-only)
 # Optional overrides (have defaults in application.yaml):
+FRONTEND_BASE_URL              # default http://localhost:5173 (used for the "forgot password" link in onboarding email)
 JWT_ACCESS_TOKEN_EXPIRATION    # default 3600 s
 JWT_REFRESH_TOKEN_EXPIRATION   # default 604800 s
 REDIS_HOST                     # default localhost
@@ -434,3 +511,7 @@ http://localhost:8088/api/uml/login/oauth2/code/google
 19. **Always handle errors via `AppException` + `ErrorCode` — guard inputs and failure paths in every service method.** Validate request DTOs at the boundary with Bean Validation (`@Valid` + `message = "ERROR_CODE_KEY"`); inside the `*Impl`, guard every lookup (`.orElseThrow(() -> new AppException(...))`), uniqueness/pre-condition, and business-state check by throwing `AppException(ErrorCode.X)`. Add a new `ErrorCode` entry (code + message + `HttpStatus`) for any new condition. Never throw raw exceptions to the controller, never hand-build an error `ApiResponse`, and never swallow a caught exception silently.
 
 20. **Auth-failure responses return a clean 401 UNAUTHENTICATED.** `GlobalExceptionHandler` now has `@ExceptionHandler(AuthenticationException.class)` → `ErrorCode.UNAUTHENTICATED` (and an `AccessDeniedException` → `UNAUTHORIZED` handler), fully replacing the disabled `JwtAuthenticationEntryPoint`. A raw `JwtException` thrown outside an `AuthenticationException` still falls through to the catch-all 500, so wrap token-parse failures in an `AuthenticationException` (or `AppException`) where possible.
+
+21. **Controllers must be thin — delegate to a `*Service`; do not inject repositories.** `currentUserId(userDetails)` resolution, URL/path parsing, and response assembly belong in the service layer (every controller except `FileController` follows this). `FileController` is a **known deviation** (injects `UserRepository`, hand-builds `FileUploadResponse`/`SignedUrlResponse`) — do not copy its shape; for new file features push that logic into `SupabaseStorageService`. Note: hand-building those two response DTOs is borderline vs Rule 18 because their source is a plain `String` from storage (no JPA entity to map), but the layering point above still applies.
+
+22. **Onboarding completion is the explicit `User.profile_completed` BOOLEAN column.** Set it on every creation path (register/admin `true`, fresh Google user `false`, onboarding `true`); it maps straight onto `MeResponse.profileCompleted` and the guard in `completeProfile` is `Boolean.TRUE.equals(...)`. Do NOT reintroduce a password-based heuristic — fresh Google users may carry a random BCrypt hash, so `password != null` is not a reliable "completed" signal (this was the bug that sent first-time Google users straight to the dashboard). Still re-validate password match + strength (≥ medium, length ≥ 8) on the server, and never put a plaintext password in any email.

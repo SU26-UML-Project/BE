@@ -21,8 +21,8 @@ public class AccountDeletionScheduler {
 
     UserRepository userRepository;
 
-    // TEST: chạy mỗi phút. Production: đổi lại "0 0 0 * * *"
-    @Scheduled(cron = "0 * * * * *")
+    // Chạy lúc 00:00 mỗi ngày, dọn các tài khoản PENDING_DELETE đã quá hạn 30 ngày.
+    @Scheduled(cron = "0 0 0 * * *")
     @Transactional
     public void purgeExpiredAccounts() {
         List<su26.uml.be.entity.User> expiredUsers = userRepository

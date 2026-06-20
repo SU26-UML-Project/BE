@@ -24,4 +24,11 @@ public class Project extends BaseEntity {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     User user;
+
+    @Column(name = "project_data", columnDefinition = "TEXT")
+    String projectData;
+
+    @Column(name = "is_deleted")
+    @Builder.Default
+    boolean isDeleted = false;
 }

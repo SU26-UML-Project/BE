@@ -25,4 +25,11 @@ public class MeResponse {
 
     @Schema(description = "Role name assigned to the user.", example = "USER")
     String role;
+
+    @Schema(description = "Avatar image URL.", example = "https://xyz.supabase.co/storage/v1/object/public/avatars/...")
+    String avatarUrl;
+
+    @Schema(description = "Whether the user has finished onboarding (set a real password). " +
+            "Google users start as false and must complete the onboarding wizard.", example = "true")
+    Boolean profileCompleted;
 }

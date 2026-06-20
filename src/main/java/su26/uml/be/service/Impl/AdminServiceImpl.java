@@ -20,6 +20,8 @@ import su26.uml.be.repository.RoleRepository;
 import su26.uml.be.repository.UserRepository;
 import su26.uml.be.service.AdminService;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -48,5 +50,36 @@ public class AdminServiceImpl implements AdminService {
         User savedUser = userRepository.save(user);
 
         return ApiResponse.success("Tạo tài khoản Admin thành công", userMapper.toUserResponse(savedUser));
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<Void> toggleUserStatus(UUID userId, String currentUserEmail) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (user.getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.DELETE_SELF_INVALID);
+        }
+
+        if ("ADMIN".equalsIgnoreCase(user.getRole().getRoleName())) {
+            throw new AppException(ErrorCode.DELETE_OTHER_ADMIN_INVALID);
+        }
+
+        String message;
+        if (user.getStatus() == UserStatus.ACTIVE) {
+            user.setStatus(UserStatus.LOCKED);
+            message = "Đã khóa tài khoản thành công";
+        } else {
+            user.setStatus(UserStatus.ACTIVE);
+            message = "Đã mở khóa tài khoản thành công";
+        }
+
+        userRepository.save(user);
+
+        return ApiResponse.success(message, null);
     }
 }

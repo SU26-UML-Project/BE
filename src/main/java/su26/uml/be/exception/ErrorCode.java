@@ -33,6 +33,7 @@ public enum ErrorCode {
     INVALID_EMAIL_FORMAT(1015, "Email không đúng định dạng (ví dụ: 112@gmail.com)", HttpStatus.BAD_REQUEST),
     USER_NOT_EXISTED(1016, "Người dùng không tồn tại", HttpStatus.NOT_FOUND),
     INVALID_FULLNAME(1017, "Họ tên không được vượt quá 255 ký tự", HttpStatus.BAD_REQUEST),
+    INVALID_AVATAR_URL(1028, "Đường dẫn ảnh đại diện không được vượt quá 500 ký tự", HttpStatus.BAD_REQUEST),
     USER_LIST_EMPTY(1018, "Không có tài khoản nào trong hệ thống!!!", HttpStatus.NOT_FOUND),
     INVALID_DOB(1025, "Ngày sinh không hợp lệ, phải là ngày trong quá khứ", HttpStatus.BAD_REQUEST),
     ACCOUNT_ALREADY_PENDING_DELETE(1026, "Tài khoản đã trong trạng thái chờ xóa", HttpStatus.BAD_REQUEST),
@@ -48,6 +49,7 @@ public enum ErrorCode {
     DELETE_OTHER_ADMIN_INVALID(1024, "Bạn không thể xóa tài khoản Quản trị viên khác!", HttpStatus.BAD_REQUEST),
 
     //reset password
+    EMAIL_NOT_FOUND(1057, "Email không tồn tại trong hệ thống", HttpStatus.NOT_FOUND),
     OTP_REQUIRED(1058, "Mã OTP không được để trống", HttpStatus.BAD_REQUEST),
     INVALID_OTP(1059, "Mã OTP phải có 6 chữ số", HttpStatus.BAD_REQUEST),
     OTP_NOT_FOUND(1060, "Mã OTP không hợp lệ hoặc đã hết hạn", HttpStatus.BAD_REQUEST),
@@ -67,6 +69,14 @@ public enum ErrorCode {
 
     PASSWORD_INCORRECT(1070, "Mật khẩu hiện tại không chính xác", HttpStatus.BAD_REQUEST),
     PASSWORD_CHANGE_LIMIT(1071, "Bạn chỉ được phép đổi mật khẩu 1 lần trong vòng 7 ngày", HttpStatus.BAD_REQUEST),
+    OTP_ATTEMPTS_EXCEEDED(1072, "Bạn đã nhập sai mã OTP quá số lần cho phép. Vui lòng yêu cầu mã mới.", HttpStatus.BAD_REQUEST),
+    OTP_NOT_VERIFIED(1073, "Vui lòng xác thực mã OTP trước khi đặt lại mật khẩu", HttpStatus.BAD_REQUEST),
+
+    // ONBOARDING (complete-profile)
+    WEAK_PASSWORD(1074, "Mật khẩu quá yếu. Cần tối thiểu 8 ký tự và đạt mức Trung bình (gồm chữ hoa, chữ thường, số hoặc ký tự đặc biệt).", HttpStatus.BAD_REQUEST),
+    PROFILE_ALREADY_COMPLETED(1075, "Hồ sơ của bạn đã được hoàn tất trước đó", HttpStatus.BAD_REQUEST),
+    DOB_REQUIRED(1076, "Ngày sinh không được để trống", HttpStatus.BAD_REQUEST),
+
 
     // NOTIFICATION & FEEDBACK ERRORS
     NOTIFICATION_NOT_FOUND(1600, "Không tìm thấy thông báo", HttpStatus.NOT_FOUND),
@@ -76,7 +86,28 @@ public enum ErrorCode {
     OAUTH2_EMAIL_NOT_VERIFIED(2001, "Email Google chưa được xác thực. Vui lòng xác thực email trước khi đăng nhập.", HttpStatus.BAD_REQUEST),
     OAUTH2_PROCESSING_ERROR(2002, "Lỗi xử lý đăng nhập Google. Vui lòng thử lại.", HttpStatus.INTERNAL_SERVER_ERROR),
 
+    // FILE / STORAGE ERRORS
+    FILE_REQUIRED(1700, "File không được để trống", HttpStatus.BAD_REQUEST),
+    INVALID_FILE_TYPE(1701, "Định dạng file không được hỗ trợ", HttpStatus.BAD_REQUEST),
+    FILE_TOO_LARGE(1702, "Kích thước file vượt quá giới hạn cho phép", HttpStatus.BAD_REQUEST),
+    FILE_READ_FAILED(1703, "Không thể đọc nội dung file", HttpStatus.INTERNAL_SERVER_ERROR),
+    FILE_UPLOAD_FAILED(1704, "Tải file lên thất bại, vui lòng thử lại", HttpStatus.INTERNAL_SERVER_ERROR),
+    FILE_DELETE_FAILED(1705, "Xóa file thất bại, vui lòng thử lại", HttpStatus.INTERNAL_SERVER_ERROR),
+    SIGNED_URL_FAILED(1706, "Không thể tạo đường dẫn truy cập file", HttpStatus.INTERNAL_SERVER_ERROR),
+    FILE_PATH_REQUIRED(1707, "Đường dẫn file không được để trống", HttpStatus.BAD_REQUEST),
+
+    // PROJECT ERRORS
+    PROJECT_NAME_REQUIRED(1800, "Tên dự án không được để trống", HttpStatus.BAD_REQUEST),
+    PROJECT_NAME_TOO_LONG(1801, "Tên dự án không được vượt quá 255 ký tự", HttpStatus.BAD_REQUEST),
+    DESCRIPTION_TOO_LONG(1802, "Mô tả không được vượt quá 1000 ký tự", HttpStatus.BAD_REQUEST),
+    PROJECT_NOT_FOUND(1803, "Không tìm thấy dự án", HttpStatus.NOT_FOUND),
+    PROJECT_ACCESS_DENIED(1804, "Bạn không có quyền truy cập dự án này", HttpStatus.FORBIDDEN),
+
+    // SHEET ERRORS
+    SHEET_NOT_FOUND(1900, "Không tìm thấy trang biểu đồ", HttpStatus.NOT_FOUND),
+    SHEET_NAME_REQUIRED(1901, "Tên trang không được để trống", HttpStatus.BAD_REQUEST),
     ;
+
     private int code;
     private String message;
     private HttpStatusCode statusCode;

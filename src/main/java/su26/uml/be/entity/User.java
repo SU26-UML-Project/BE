@@ -52,7 +52,7 @@ public class User extends BaseEntity {
     LocalDateTime deletionDate;
 
     @Column(name = "avatar_url", length = 500)
-String avatarUrl;
+    String avatarUrl;
 
     @Column(name = "dob")
     LocalDate dob;
@@ -63,13 +63,9 @@ String avatarUrl;
     @Column(name = "last_password_change_at")
     LocalDateTime lastPasswordChangeAt;
 
-//    // ── NEW: AWS Cognito user identifier ─────────────────────────────────────
-//    // Populated by CognitoUserSyncFilter on the first authenticated request.
-//    // Used to link Cognito identities to existing local accounts and to prevent
-//    // duplicate JIT provisioning when a user's email changes in Cognito.
-//    //
-//    // DDL note: hibernate.ddl-auto=update will ADD this column automatically on
-//    // the next application start — no manual migration required.
-//    @Column(name = "cognito_sub", unique = true)
-//    String cognitoSub;
+    // true = đã hoàn tất hồ sơ (đăng ký thường, hoặc Google user đã onboarding).
+    // false = Google user đăng nhập lần đầu, chưa bổ sung thông tin → phải qua onboarding wizard.
+    @Column(name = "profile_completed")
+    Boolean profileCompleted;
+
 }
