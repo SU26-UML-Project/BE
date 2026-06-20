@@ -67,6 +67,15 @@ public enum ErrorCode {
     CHAT_MESSAGE_REQUIRED(1078, "Tin nhắn không được để trống", HttpStatus.BAD_REQUEST),
     ANYTHING_LLM_ERROR(1079, "Không thể kết nối hoặc xử lý phản hồi từ AnythingLLM", HttpStatus.INTERNAL_SERVER_ERROR),
 
+    AI_SYSTEM_CONFIG_FAILED(1080, "Không thể lấy cấu hình hệ thống AnythingLLM", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_UPDATE_CONFIG_FAILED(1081, "Không thể cập nhật cấu hình AnythingLLM", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_CONNECTION_FAILED(1082, "Không thể kết nối đến AnythingLLM", HttpStatus.SERVICE_UNAVAILABLE),
+    AI_WORKSPACE_NOT_FOUND(1083, "Không tìm thấy workspace trên AnythingLLM", HttpStatus.NOT_FOUND),
+    AI_WORKSPACE_UPDATE_FAILED(1084, "Không thể cập nhật workspace", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_DOCUMENT_UPLOAD_FAILED(1085, "Tải document lên AnythingLLM thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_DOCUMENT_DELETE_FAILED(1086, "Xoá document thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_RE_EMBED_FAILED(1087, "Re-embed documents thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
+
     PASSWORD_INCORRECT(1070, "Mật khẩu hiện tại không chính xác", HttpStatus.BAD_REQUEST),
     PASSWORD_CHANGE_LIMIT(1071, "Bạn chỉ được phép đổi mật khẩu 1 lần trong vòng 7 ngày", HttpStatus.BAD_REQUEST),
     OTP_ATTEMPTS_EXCEEDED(1072, "Bạn đã nhập sai mã OTP quá số lần cho phép. Vui lòng yêu cầu mã mới.", HttpStatus.BAD_REQUEST),
