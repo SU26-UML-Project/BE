@@ -1,0 +1,20 @@
+package su26.uml.be.repository;
+
+import org.springframework.data.mongodb.repository.MongoRepository;
+import su26.uml.be.entity.AiChatSessionDocument;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface AiChatSessionMongoRepository
+        extends MongoRepository<AiChatSessionDocument, String> {
+
+    Optional<AiChatSessionDocument>
+    findFirstByUserIdAndStatusOrderByUpdatedAtDesc(String userId, String status);
+
+    Optional<AiChatSessionDocument>
+    findByAnythingSessionIdAndUserId(String anythingSessionId, String userId);
+
+    List<AiChatSessionDocument>
+    findByUserIdOrderByUpdatedAtDesc(String userId);
+}

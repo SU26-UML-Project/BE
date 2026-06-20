@@ -62,10 +62,11 @@ public enum ErrorCode {
     CHAT_SESSION_PROCESSING_ERROR(1068, "Không thể xử lý dữ liệu lịch sử chat", HttpStatus.INTERNAL_SERVER_ERROR),
     CHAT_SESSION_TITLE_REQUIRED(1069, "Tiêu đề phiên chat không được để trống", HttpStatus.BAD_REQUEST),
     CHAT_SESSION_NOT_FOUND(1077, "Không tìm thấy phiên chat", HttpStatus.NOT_FOUND),
+    CHAT_MESSAGE_REQUIRED(1078, "Tin nhắn không được để trống", HttpStatus.BAD_REQUEST),
+    ANYTHING_LLM_ERROR(1079, "Không thể kết nối hoặc xử lý phản hồi từ AnythingLLM", HttpStatus.INTERNAL_SERVER_ERROR),
 
     PASSWORD_INCORRECT(1070, "Mật khẩu hiện tại không chính xác", HttpStatus.BAD_REQUEST),
     PASSWORD_CHANGE_LIMIT(1071, "Bạn chỉ được phép đổi mật khẩu 1 lần trong vòng 7 ngày", HttpStatus.BAD_REQUEST),
-
 
     // NOTIFICATION & FEEDBACK ERRORS
     NOTIFICATION_NOT_FOUND(1600, "Không tìm thấy thông báo", HttpStatus.NOT_FOUND),
@@ -73,8 +74,9 @@ public enum ErrorCode {
 
     // OAUTH2 ERRORS
     OAUTH2_EMAIL_NOT_VERIFIED(2001, "Email Google chưa được xác thực. Vui lòng xác thực email trước khi đăng nhập.", HttpStatus.BAD_REQUEST),
-    OAUTH2_PROCESSING_ERROR(2002, "Lỗi xử lý đăng nhập Google. Vui lòng thử lại.", HttpStatus.INTERNAL_SERVER_ERROR),;
+    OAUTH2_PROCESSING_ERROR(2002, "Lỗi xử lý đăng nhập Google. Vui lòng thử lại.", HttpStatus.INTERNAL_SERVER_ERROR),
 
+    ;
     private int code;
     private String message;
     private HttpStatusCode statusCode;
