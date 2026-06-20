@@ -14,4 +14,5 @@ public interface ProjectService {
     ApiResponse<Void> deleteProject(DeleteProjectRequest request, String email);
     ApiResponse<ProjectResponse> getProjectById(UUID projectId, String email);
     ApiResponse<List<ProjectResponse>> getAllUserProjects(String email);
+    ApiResponse<List<ProjectResponse>> getAllProjectsForAdmin();
 }

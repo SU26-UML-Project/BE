@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +28,7 @@ public class ProjectController {
     ProjectService projectService;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Operation(summary = "Create a new project", description = "Creates a new UML project and a default sheet.")
     public ApiResponse<ProjectResponse> createProject(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -35,12 +37,21 @@ public class ProjectController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Operation(summary = "Get all projects", description = "Returns all projects belonging to the authenticated user.")
     public ApiResponse<List<ProjectResponse>> getAllProjects(@AuthenticationPrincipal UserDetails userDetails) {
         return projectService.getAllUserProjects(userDetails.getUsername());
     }
 
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Get all projects for Admin", description = "Returns all projects in the system. Restricted to ADMIN.")
+    public ApiResponse<List<ProjectResponse>> getAllProjectsForAdmin() {
+        return projectService.getAllProjectsForAdmin();
+    }
+
     @GetMapping("/{projectId}")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Operation(summary = "Get project by ID", description = "Returns project details if the user owns it.")
     public ApiResponse<ProjectResponse> getProjectById(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -49,6 +60,7 @@ public class ProjectController {
     }
 
     @PatchMapping("/{projectId}")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Operation(summary = "Update project", description = "Updates project name and description.")
     public ApiResponse<ProjectResponse> updateProject(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -58,6 +70,7 @@ public class ProjectController {
     }
 
     @DeleteMapping
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Operation(summary = "Delete projects", description = "Soft-deletes one or multiple projects and saves version snapshots.")
     public ApiResponse<Void> deleteProject(
             @AuthenticationPrincipal UserDetails userDetails,

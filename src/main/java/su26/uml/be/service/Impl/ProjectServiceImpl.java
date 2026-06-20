@@ -1,8 +1,8 @@
 package su26.uml.be.service.Impl;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,10 +67,14 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     public ApiResponse<Void> deleteProject(DeleteProjectRequest request, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        boolean isAdmin = user.getRole().getRoleName().equals("ADMIN");
+
         List<Project> projects = projectRepository.findAllByIdIn(request.getIds());
         
         for (Project project : projects) {
-            if (!project.getUser().getEmail().equals(email)) {
+            if (!isAdmin && !project.getUser().getEmail().equals(email)) {
                 throw new AppException(ErrorCode.PROJECT_ACCESS_DENIED);
             }
             
@@ -82,7 +86,7 @@ public class ProjectServiceImpl implements ProjectService {
         
         projectRepository.saveAll(projects);
         
-        log.info("Bulk soft-deleted {} projects by user: {}", projects.size(), email);
+        log.info("Bulk soft-deleted {} projects by user/admin: {}", projects.size(), email);
         return ApiResponse.success("Xóa các dự án thành công");
     }
 
@@ -101,6 +105,13 @@ public class ProjectServiceImpl implements ProjectService {
         return ApiResponse.success("Lấy danh sách dự án thành công", projectMapper.toProjectResponseList(projects));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<List<ProjectResponse>> getAllProjectsForAdmin() {
+        List<Project> projects = projectRepository.findAllByIsDeletedFalse();
+        return ApiResponse.success("Lấy danh sách tất cả dự án thành công (Admin)", projectMapper.toProjectResponseList(projects));
+    }
+
     private Project getProjectAndValidateOwnership(UUID projectId, String email) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
@@ -109,7 +120,12 @@ public class ProjectServiceImpl implements ProjectService {
             throw new AppException(ErrorCode.PROJECT_NOT_FOUND);
         }
 
-        if (!project.getUser().getEmail().equals(email)) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        boolean isAdmin = user.getRole().getRoleName().equals("ADMIN");
+
+        if (!isAdmin && !project.getUser().getEmail().equals(email)) {
             throw new AppException(ErrorCode.PROJECT_ACCESS_DENIED);
         }
         return project;
