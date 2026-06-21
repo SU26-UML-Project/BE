@@ -19,6 +19,9 @@ public class AiWorkspaceResponse {
     Double temperature;
     Integer topN;
     Double similarityThreshold;
+    Integer openAiHistory;
+    String openAiPrompt;
+    String queryRefusalResponse;
     Integer documentCount;
     List<AiDocumentResponse> documents;
 }

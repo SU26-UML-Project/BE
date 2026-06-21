@@ -18,9 +18,11 @@ public interface AiAdminService {
 
     ApiResponse<AiTestConnectionResponse> testConnection();
 
-    ApiResponse<AiWorkspaceResponse> getWorkspace();
+    ApiResponse<AiWorkspaceResponse> getWorkspaceBySlug(String slug);
 
-    ApiResponse<AiWorkspaceResponse> updateWorkspace(AiWorkspaceUpdateRequest request);
+    ApiResponse<AiWorkspaceResponse> updateWorkspace(AiWorkspaceUpdateRequest request, String slug);
+
+    ApiResponse<List<String>> getProviderModels(String provider, String basePath);
 
     ApiResponse<List<AiWorkspaceListItem>> getWorkspaces();
 

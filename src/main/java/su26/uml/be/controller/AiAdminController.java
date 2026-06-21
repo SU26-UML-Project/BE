@@ -54,16 +54,26 @@ public class AiAdminController {
     }
 
     @GetMapping("/workspace")
-    @Operation(summary = "Get workspace", description = "Get current workspace details including RAG settings.")
-    public ApiResponse<AiWorkspaceResponse> getWorkspace() {
-        return aiAdminService.getWorkspace();
+    @Operation(summary = "Get workspace", description = "Get current workspace details including RAG settings. Optional ?slug= query param, defaults to configured workspace.")
+    public ApiResponse<AiWorkspaceResponse> getWorkspace(
+            @RequestParam(required = false) String slug) {
+        return aiAdminService.getWorkspaceBySlug(slug);
     }
 
     @PutMapping("/workspace")
-    @Operation(summary = "Update workspace", description = "Update workspace model, chat mode, and RAG settings.")
+    @Operation(summary = "Update workspace", description = "Update workspace model, chat mode, and RAG settings. Optional ?slug= query param, defaults to configured workspace.")
     public ApiResponse<AiWorkspaceResponse> updateWorkspace(
-            @Valid @RequestBody AiWorkspaceUpdateRequest request) {
-        return aiAdminService.updateWorkspace(request);
+            @Valid @RequestBody AiWorkspaceUpdateRequest request,
+            @RequestParam(required = false) String slug) {
+        return aiAdminService.updateWorkspace(request, slug);
+    }
+
+    @GetMapping("/providers/{provider}/models")
+    @Operation(summary = "Get provider models", description = "Fetch available models for a given LLM provider from AnythingLLM. Optional ?basePath= query param.")
+    public ApiResponse<List<String>> getProviderModels(
+            @PathVariable String provider,
+            @RequestParam(required = false) String basePath) {
+        return aiAdminService.getProviderModels(provider, basePath);
     }
 
     @GetMapping("/workspaces")

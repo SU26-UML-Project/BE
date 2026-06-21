@@ -48,7 +48,6 @@ public class AiAdminServiceImpl implements AiAdminService {
         try {
             Map<String, Object> envConfig = buildSystemEnvConfig(request);
             anythingLlmClient.updateSystemConfig(envConfig);
-            anythingLlmClient.applySystemSettings();
             return getSystemConfig();
         } catch (Exception e) {
             log.error("Failed to update system config", e);
@@ -58,13 +57,8 @@ public class AiAdminServiceImpl implements AiAdminService {
 
     @Override
     public ApiResponse<List<String>> getSupportedProviders() {
-        try {
-            List<String> providers = anythingLlmClient.getSystemPreferences();
-            return ApiResponse.success("OK", providers);
-        } catch (Exception e) {
-            log.error("Failed to fetch supported providers", e);
-            return ApiResponse.success("OK", List.of());
-        }
+        List<String> providers = anythingLlmClient.getSystemPreferences();
+        return ApiResponse.success("OK", providers);
     }
 
     @Override
@@ -90,9 +84,10 @@ public class AiAdminServiceImpl implements AiAdminService {
     }
 
     @Override
-    public ApiResponse<AiWorkspaceResponse> getWorkspace() {
+    public ApiResponse<AiWorkspaceResponse> getWorkspaceBySlug(String slug) {
         try {
-            Map<String, Object> raw = anythingLlmClient.getWorkspaceBySlug(properties.workspaceSlug());
+            String resolved = slug != null && !slug.isBlank() ? slug : properties.workspaceSlug();
+            Map<String, Object> raw = anythingLlmClient.getWorkspaceBySlug(resolved);
             Map<String, Object> workspace = extractWorkspace(raw);
             return ApiResponse.success("OK", mapToWorkspaceResponse(workspace));
         } catch (Exception e) {
@@ -103,8 +98,9 @@ public class AiAdminServiceImpl implements AiAdminService {
 
     @Override
     @SuppressWarnings("unchecked")
-    public ApiResponse<AiWorkspaceResponse> updateWorkspace(AiWorkspaceUpdateRequest request) {
+    public ApiResponse<AiWorkspaceResponse> updateWorkspace(AiWorkspaceUpdateRequest request, String slug) {
         try {
+            String resolved = slug != null && !slug.isBlank() ? slug : properties.workspaceSlug();
             Map<String, Object> settings = new HashMap<>();
             if (request.getModel() != null) settings.put("chatModel", request.getModel());
             if (request.getChatProvider() != null) settings.put("chatProvider", request.getChatProvider());
@@ -112,8 +108,11 @@ public class AiAdminServiceImpl implements AiAdminService {
             if (request.getTemperature() != null) settings.put("openAiTemp", request.getTemperature());
             if (request.getTopN() != null) settings.put("topN", request.getTopN());
             if (request.getSimilarityThreshold() != null) settings.put("similarityThreshold", request.getSimilarityThreshold());
+            if (request.getOpenAiHistory() != null) settings.put("openAiHistory", request.getOpenAiHistory());
+            if (request.getOpenAiPrompt() != null) settings.put("openAiPrompt", request.getOpenAiPrompt());
+            if (request.getQueryRefusalResponse() != null) settings.put("queryRefusalResponse", request.getQueryRefusalResponse());
 
-            Map<String, Object> raw = anythingLlmClient.updateWorkspace(settings);
+            Map<String, Object> raw = anythingLlmClient.updateWorkspace(settings, resolved);
             Map<String, Object> workspace;
             if (raw != null && raw.containsKey("workspace")) {
                 Object ws = raw.get("workspace");
@@ -209,46 +208,97 @@ public class AiAdminServiceImpl implements AiAdminService {
         }
     }
 
+    @Override
+    @SuppressWarnings("unchecked")
+    public ApiResponse<List<String>> getProviderModels(String provider, String basePath) {
+        try {
+            if (basePath == null || basePath.isBlank()) {
+                try {
+                    Map<String, Object> config = anythingLlmClient.getSystemConfig();
+                    Map<String, Object> settings = (Map<String, Object>) config.get("settings");
+                    if (settings != null) {
+                        String path = str(settings.get("OLLAMA_BASE_PATH"));
+                        if (path != null && !path.isBlank()) basePath = path;
+                    }
+                } catch (Exception e) {
+                    log.warn("Could not read OLLAMA_BASE_PATH from system config", e);
+                }
+            }
+
+            Map<String, Object> result = anythingLlmClient.getCustomModels(provider, null, basePath);
+            List<Map<String, Object>> models = (List<Map<String, Object>>) result.getOrDefault("models", List.of());
+            List<String> modelIds = models.stream()
+                    .map(m -> str(m.get("id")))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            return ApiResponse.success("OK", modelIds);
+        } catch (Exception e) {
+            log.error("Failed to fetch models for provider {}", provider, e);
+            throw new AppException(ErrorCode.AI_PROVIDER_MODELS_FAILED);
+        }
+    }
+
     // ─── Private helpers ─────────────────────────────────────────
 
     private Map<String, Object> buildSystemEnvConfig(AiSystemConfigRequest request) {
         Map<String, Object> env = new HashMap<>();
+        String provider = request.getLlmProvider() != null ? request.getLlmProvider().toLowerCase() : "";
 
         if (request.getLlmProvider() != null) {
-            env.put("LLM_PROVIDER", request.getLlmProvider());
+            env.put("LLMProvider", request.getLlmProvider());
         }
 
         if (request.getBaseUrl() != null) {
-            String provider = request.getLlmProvider() != null ? request.getLlmProvider().toLowerCase() : "";
             if ("ollama".equals(provider)) {
-                env.put("OLLAMA_BASE_PATH", request.getBaseUrl());
+                env.put("OllamaLLMBasePath", request.getBaseUrl());
             }
         }
 
         if (request.getApiKey() != null) {
-            String provider = request.getLlmProvider() != null ? request.getLlmProvider().toLowerCase() : "";
             switch (provider) {
-                case "openai" -> env.put("OPEN_AI_KEY", request.getApiKey());
-                case "anthropic" -> env.put("ANTHROPIC_API_KEY", request.getApiKey());
-                case "azure" -> env.put("AZURE_OPENAI_KEY", request.getApiKey());
-                case "google", "gemini" -> env.put("GEMINI_API_KEY", request.getApiKey());
+                case "openai" -> env.put("OpenAiKey", request.getApiKey());
+                case "anthropic" -> env.put("AnthropicApiKey", request.getApiKey());
+                case "azure" -> env.put("AzureOpenAiKey", request.getApiKey());
+                case "google", "gemini" -> env.put("GeminiLLMApiKey", request.getApiKey());
             }
         }
 
         if (request.getModel() != null) {
-            env.put("LLM_MODEL", request.getModel());
+            switch (provider) {
+                case "ollama" -> env.put("OllamaLLMModelPref", request.getModel());
+                case "openai" -> env.put("OpenAiModelPref", request.getModel());
+                case "anthropic" -> env.put("AnthropicModelPref", request.getModel());
+                case "google", "gemini" -> env.put("GeminiLLMModelPref", request.getModel());
+                case "azure" -> env.put("AzureOpenAiModelPref", request.getModel());
+                default -> env.put("OpenAiModelPref", request.getModel());
+            }
         }
 
         if (request.getVectorDb() != null) {
-            env.put("VECTOR_DB", request.getVectorDb());
+            env.put("VectorDB", request.getVectorDb());
         }
 
         if (request.getVectorDbEndpoint() != null) {
-            env.put("VECTOR_DB_ENDPOINT", request.getVectorDbEndpoint());
+            String vdb = request.getVectorDb() != null ? request.getVectorDb().toLowerCase() : "";
+            switch (vdb) {
+                case "qdrant" -> env.put("QdrantEndpoint", request.getVectorDbEndpoint());
+                case "pinecone" -> env.put("PineConeEndpoint", request.getVectorDbEndpoint());
+                case "chroma" -> env.put("ChromaEndpoint", request.getVectorDbEndpoint());
+                case "weaviate" -> env.put("WeaviateEndpoint", request.getVectorDbEndpoint());
+                case "milvus" -> env.put("MilvusAddress", request.getVectorDbEndpoint());
+                default -> env.put("QdrantEndpoint", request.getVectorDbEndpoint());
+            }
         }
 
         if (request.getVectorDbApiKey() != null) {
-            env.put("VECTOR_DB_API_KEY", request.getVectorDbApiKey());
+            String vdb = request.getVectorDb() != null ? request.getVectorDb().toLowerCase() : "";
+            switch (vdb) {
+                case "qdrant" -> env.put("QdrantApiKey", request.getVectorDbApiKey());
+                case "chroma" -> env.put("ChromaApiKey", request.getVectorDbApiKey());
+                case "weaviate" -> env.put("WeaviateApiKey", request.getVectorDbApiKey());
+                case "pinecone" -> env.put("PineConeKey", request.getVectorDbApiKey());
+                default -> env.put("QdrantApiKey", request.getVectorDbApiKey());
+            }
         }
 
         return env;
@@ -336,6 +386,9 @@ public class AiAdminServiceImpl implements AiAdminService {
         Object simObj = ws.get("similarityThreshold");
         Double similarityThreshold = simObj instanceof Number ? ((Number) simObj).doubleValue() : null;
 
+        Object historyObj = ws.get("openAiHistory");
+        Integer openAiHistory = historyObj instanceof Number ? ((Number) historyObj).intValue() : null;
+
         List<Map<String, Object>> rawDocs = (List<Map<String, Object>>) ws.getOrDefault("documents", List.of());
         List<AiDocumentResponse> documents = rawDocs.stream()
                 .map(this::mapToDocumentResponse)
@@ -350,6 +403,9 @@ public class AiAdminServiceImpl implements AiAdminService {
                 .temperature(temperature)
                 .topN(topN)
                 .similarityThreshold(similarityThreshold)
+                .openAiHistory(openAiHistory)
+                .openAiPrompt(str(ws.get("openAiPrompt")))
+                .queryRefusalResponse(str(ws.get("queryRefusalResponse")))
                 .documentCount(documents.size())
                 .documents(documents)
                 .build();

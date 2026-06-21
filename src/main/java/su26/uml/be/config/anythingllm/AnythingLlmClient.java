@@ -51,55 +51,12 @@ public class AnythingLlmClient {
                 .block(Duration.ofSeconds(10));
     }
 
-    @SuppressWarnings("unchecked")
-    public java.util.List<String> getSystemPreferences() {
-        try {
-            Map<String, Object> raw = anythingLlmWebClient.get()
-                    .uri("/v1/system/")
-                    .accept(MediaType.APPLICATION_JSON)
-                    .retrieve()
-                    .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
-                    .block(Duration.ofSeconds(10));
-            if (raw == null) return defaultProviders();
-            Map<String, Object> settings = (Map<String, Object>) raw.get("settings");
-            if (settings == null) return defaultProviders();
-            List<String> providers = deriveProviders(settings);
-            return providers.isEmpty() ? defaultProviders() : providers;
-        } catch (Exception e) {
-            return defaultProviders();
-        }
-    }
-
-    private java.util.List<String> defaultProviders() {
-        return java.util.List.of(
+    public List<String> getSystemPreferences() {
+        return List.of(
             "ollama", "openai", "anthropic", "google", "mistral",
             "groq", "together", "deepseek", "openrouter", "perplexity",
             "azure", "cohere", "fireworks", "novita"
         );
-    }
-
-    private java.util.List<String> deriveProviders(Map<String, Object> settings) {
-        java.util.List<String> result = new java.util.ArrayList<>();
-        if (Boolean.TRUE.equals(settings.get("OpenAiKey")) || isNonEmpty(settings.get("OpenAiKey"))) result.add("openai");
-        if (Boolean.TRUE.equals(settings.get("AnthropicApiKey")) || isNonEmpty(settings.get("AnthropicApiKey"))) result.add("anthropic");
-        if (Boolean.TRUE.equals(settings.get("GeminiLLMApiKey")) || isNonEmpty(settings.get("GeminiLLMApiKey"))) result.add("google");
-        if (Boolean.TRUE.equals(settings.get("MistralApiKey")) || isNonEmpty(settings.get("MistralApiKey"))) result.add("mistral");
-        if (Boolean.TRUE.equals(settings.get("GroqApiKey")) || isNonEmpty(settings.get("GroqApiKey"))) result.add("groq");
-        if (Boolean.TRUE.equals(settings.get("TogetherAiApiKey")) || isNonEmpty(settings.get("TogetherAiApiKey"))) result.add("together");
-        if (Boolean.TRUE.equals(settings.get("DeepSeekApiKey")) || isNonEmpty(settings.get("DeepSeekApiKey"))) result.add("deepseek");
-        if (Boolean.TRUE.equals(settings.get("OpenRouterApiKey")) || isNonEmpty(settings.get("OpenRouterApiKey"))) result.add("openrouter");
-        if (Boolean.TRUE.equals(settings.get("PerplexityApiKey")) || isNonEmpty(settings.get("PerplexityApiKey"))) result.add("perplexity");
-        if (Boolean.TRUE.equals(settings.get("FireworksAiLLMApiKey")) || isNonEmpty(settings.get("FireworksAiLLMApiKey"))) result.add("fireworks");
-        if (Boolean.TRUE.equals(settings.get("NovitaLLMApiKey")) || isNonEmpty(settings.get("NovitaLLMApiKey"))) result.add("novita");
-        String llmProvider = settings.get("LLMProvider") instanceof String ? (String) settings.get("LLMProvider") : "";
-        if (!llmProvider.isEmpty() && !result.contains(llmProvider.toLowerCase())) {
-            result.add(0, llmProvider.toLowerCase());
-        }
-        return result;
-    }
-
-    private boolean isNonEmpty(Object value) {
-        return value instanceof String s && !s.isEmpty() && !"false".equalsIgnoreCase(s);
     }
 
     public Map<String, Object> updateSystemConfig(Map<String, Object> config) {
@@ -118,6 +75,23 @@ public class AnythingLlmClient {
                 .uri("/v1/system/update-settings")
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
+                .block(Duration.ofSeconds(15));
+    }
+
+    // ─── Custom Models ───────────────────────────────────────────
+    public Map<String, Object> getCustomModels(String provider, String apiKey, String basePath) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("provider", provider);
+        if (apiKey != null) body.put("apiKey", apiKey);
+        if (basePath != null) body.put("basePath", basePath);
+
+        return anythingLlmWebClient.post()
+                .uri("/system/custom-models")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
                 .retrieve()
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .block(Duration.ofSeconds(15));
@@ -159,9 +133,9 @@ public class AnythingLlmClient {
                 .block(Duration.ofSeconds(10));
     }
 
-    public Map<String, Object> updateWorkspace(Map<String, Object> settings) {
+    public Map<String, Object> updateWorkspace(Map<String, Object> settings, String slug) {
         return anythingLlmWebClient.post()
-                .uri("/v1/workspace/{slug}/update", properties.workspaceSlug())
+                .uri("/v1/workspace/{slug}/update", slug)
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .bodyValue(settings)

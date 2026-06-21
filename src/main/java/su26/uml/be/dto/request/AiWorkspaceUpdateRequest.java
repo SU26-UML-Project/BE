@@ -15,4 +15,7 @@ public class AiWorkspaceUpdateRequest {
     Double temperature;
     Integer topN;
     Double similarityThreshold;
+    Integer openAiHistory;
+    String openAiPrompt;
+    String queryRefusalResponse;
 }
