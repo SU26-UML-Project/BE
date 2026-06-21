@@ -103,6 +103,12 @@ public class AiAdminController {
         return aiAdminService.deleteDocument(request);
     }
 
+    @GetMapping("/version")
+    @Operation(summary = "Get AI version info", description = "Get AnythingLLM version, current LLM provider, model, and environment.")
+    public ApiResponse<AiVersionResponse> getVersion() {
+        return aiAdminService.getVersion();
+    }
+
     @PostMapping("/documents/re-embed")
     @Operation(summary = "Re-embed documents", description = "Re-embed documents in a workspace. Optional ?workspace= query param, defaults to configured workspace.")
     public ApiResponse<Void> reEmbedDocuments(

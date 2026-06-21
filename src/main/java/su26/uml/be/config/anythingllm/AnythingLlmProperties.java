@@ -7,6 +7,10 @@ public record AnythingLlmProperties(
         String baseUrl,
         String apiKey,
         String workspaceSlug,
-        String modelName
+        String modelName,
+        String version
 ) {
+    public AnythingLlmProperties {
+        if (version == null) version = "1.14.0";
+    }
 }

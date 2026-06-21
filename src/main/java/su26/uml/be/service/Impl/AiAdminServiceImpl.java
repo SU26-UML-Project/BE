@@ -209,6 +209,44 @@ public class AiAdminServiceImpl implements AiAdminService {
     }
 
     @Override
+    public ApiResponse<AiVersionResponse> getVersion() {
+        String version = properties.version();
+        String llmProvider = null;
+        String llmModel = null;
+
+        try {
+            Map<String, Object> raw = anythingLlmClient.getVersion();
+            if (raw != null && raw.containsKey("version")) {
+                version = str(raw.get("version"));
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch version from AnythingLLM, using config default: {}", version);
+        }
+
+        try {
+            Map<String, Object> config = anythingLlmClient.getSystemConfig();
+            Map<String, Object> settings = (Map<String, Object>) config.get("settings");
+            if (settings != null) {
+                llmProvider = str(settings.get("LLMProvider"));
+                llmModel = str(settings.get("LLMModel"));
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch system config for version info");
+        }
+
+        String baseUrl = properties.baseUrl();
+        String environment = (baseUrl != null && baseUrl.contains("onrender.com"))
+                ? "Production" : "Development";
+
+        return ApiResponse.success("OK", AiVersionResponse.builder()
+                .version(version != null ? version : "unknown")
+                .llmProvider(llmProvider)
+                .model(llmModel)
+                .environment(environment)
+                .build());
+    }
+
+    @Override
     @SuppressWarnings("unchecked")
     public ApiResponse<List<String>> getProviderModels(String provider, String basePath) {
         try {

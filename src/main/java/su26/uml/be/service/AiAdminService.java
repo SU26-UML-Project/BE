@@ -33,4 +33,6 @@ public interface AiAdminService {
     ApiResponse<Void> deleteDocument(AiDocumentDeleteRequest request);
 
     ApiResponse<Void> reEmbedDocuments(String workspaceSlug);
+
+    ApiResponse<AiVersionResponse> getVersion();
 }

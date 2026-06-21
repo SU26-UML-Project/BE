@@ -192,4 +192,13 @@ public class AnythingLlmClient {
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .block(Duration.ofSeconds(120));
     }
+
+    public Map<String, Object> getVersion() {
+        return anythingLlmWebClient.get()
+                .uri("/")
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
+                .block(Duration.ofSeconds(10));
+    }
 }
