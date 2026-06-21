@@ -30,6 +30,8 @@ public class DiagramChatHistoryResponse {
 
         String modelName;
 
+        List<DiagramChatResponse.QuestionResponse> questions;
+
         LocalDateTime createdAt;
     }
 }

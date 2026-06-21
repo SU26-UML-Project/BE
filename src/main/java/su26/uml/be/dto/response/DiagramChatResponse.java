@@ -17,5 +17,18 @@ public class DiagramChatResponse {
 
     String sessionId;
 
+    List<QuestionResponse> questions;
+
     List<Map<String, Object>> sources;
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Builder
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    public static class QuestionResponse {
+        String title;
+        String type;
+        List<String> options;
+    }
 }

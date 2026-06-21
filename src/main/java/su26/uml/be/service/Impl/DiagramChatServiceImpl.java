@@ -1,5 +1,7 @@
 package su26.uml.be.service.Impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import su26.uml.be.config.anythingllm.AnythingLlmClient;
@@ -18,6 +20,9 @@ import su26.uml.be.repository.AiChatMessageMongoRepository;
 import su26.uml.be.repository.AiChatSessionMongoRepository;
 import su26.uml.be.service.DiagramChatService;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -43,6 +48,7 @@ public class DiagramChatServiceImpl implements DiagramChatService {
     private final AnythingLlmProperties anythingLlmProperties;
     private final AiChatSessionMongoRepository chatSessionRepository;
     private final AiChatMessageMongoRepository chatMessageRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public DiagramChatResponse chat(String userId, DiagramChatRequest request) {
@@ -61,11 +67,14 @@ public class DiagramChatServiceImpl implements DiagramChatService {
                     session.getAnythingSessionId()
             );
 
-            String answer = cleanAnswer(anythingResponse.getTextResponse());
+            String rawAnswer = cleanAnswer(anythingResponse.getTextResponse());
 
-            if (answer.isBlank()) {
+            if (rawAnswer.isBlank()) {
                 throw new AppException(ErrorCode.ANYTHING_LLM_ERROR);
             }
+
+            // Parse JSON from AI
+            AiResponseContent parsedContent = parseAiResponse(rawAnswer);
 
             List<AiSourceDocument> sourceDocuments = mapSources(anythingResponse.getSources());
 
@@ -74,16 +83,30 @@ public class DiagramChatServiceImpl implements DiagramChatService {
             saveAssistantMessage(
                     userId,
                     session.getId(),
-                    answer,
+                    parsedContent.getMessage(),
                     anythingLlmProperties.modelName(),
-                    sourceDocuments
+                    sourceDocuments,
+                    parsedContent.getQuestions().stream()
+                            .map(q -> AiChatMessageDocument.QuestionData.builder()
+                                    .title(q.getTitle())
+                                    .type(q.getType())
+                                    .options(q.getOptions())
+                                    .build())
+                            .collect(Collectors.toList())
             );
 
             session.setUpdatedAt(LocalDateTime.now());
             chatSessionRepository.save(session);
 
             return DiagramChatResponse.builder()
-                    .answer(answer)
+                    .answer(parsedContent.getMessage())
+                    .questions(parsedContent.getQuestions().stream()
+                            .map(q -> DiagramChatResponse.QuestionResponse.builder()
+                                    .title(q.getTitle())
+                                    .type(q.getType())
+                                    .options(q.getOptions())
+                                    .build())
+                            .collect(Collectors.toList()))
                     .sessionId(session.getAnythingSessionId())
                     .sources(anythingResponse.getSources() == null ? List.of() : anythingResponse.getSources())
                     .build();
@@ -136,11 +159,103 @@ public class DiagramChatServiceImpl implements DiagramChatService {
                                 .role(message.getRole())
                                 .content(message.getContent())
                                 .modelName(message.getModelName())
+                                .questions(message.getQuestions() == null ? List.of() : message.getQuestions().stream()
+                                        .map(q -> DiagramChatResponse.QuestionResponse.builder()
+                                                .title(q.getTitle())
+                                                .type(q.getType())
+                                                .options(q.getOptions())
+                                                .build())
+                                        .collect(Collectors.toList()))
                                 .createdAt(message.getCreatedAt())
                                 .build()
                         )
                         .toList())
                 .build();
+    }
+
+    private AiResponseContent parseAiResponse(String rawAnswer) {
+        String cleanedJson = rawAnswer.trim();
+        
+        // Loại bỏ markdown code blocks nếu có
+        if (cleanedJson.startsWith("```")) {
+            cleanedJson = cleanedJson.replaceAll("^```[a-z]*\\n?", "").replaceAll("\\n?```$", "").trim();
+        }
+
+        try {
+            AiResponseContent content = objectMapper.readValue(cleanedJson, AiResponseContent.class);
+            
+            // Xử lý từng câu hỏi trong danh sách
+            if (content.getQuestions() != null) {
+                for (AiResponseContent.QuestionContent q : content.getQuestions()) {
+                    if (q.getOptions() != null && !q.getOptions().isEmpty()) {
+                        List<String> options = new ArrayList<>(q.getOptions());
+                        if (!options.contains("Khác")) {
+                            options.add("Khác");
+                        }
+                        q.setOptions(options);
+                    }
+                }
+            } else {
+                content.setQuestions(Collections.emptyList());
+            }
+            
+            return content;
+        } catch (JsonProcessingException e) {
+            // Fallback: Smart Parse nếu không phải JSON
+            return smartParseBulletPoints(rawAnswer);
+        }
+    }
+
+    /**
+     * Tự động quét các bullet points trong text để biến thành QuestionBox
+     */
+    private AiResponseContent smartParseBulletPoints(String text) {
+        List<AiResponseContent.QuestionContent> questions = new ArrayList<>();
+        
+        // Regex tìm các dòng bắt đầu bằng -, *, + hoặc số thứ tự
+        Pattern bulletPattern = Pattern.compile("^[\\s]*[-*+•][\\s]+(.*)$|^[\\s]*[0-9]+\\.[\\s]+(.*)$", Pattern.MULTILINE);
+        Matcher matcher = bulletPattern.matcher(text);
+        
+        List<String> options = new ArrayList<>();
+        while (matcher.find()) {
+            String option = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+            if (option != null && !option.trim().isEmpty()) {
+                options.add(option.trim());
+            }
+        }
+
+        if (!options.isEmpty()) {
+            options.add("Khác");
+            questions.add(AiResponseContent.QuestionContent.builder()
+                    .title("Vui lòng chọn hoặc bổ sung thông tin:")
+                    .type("single_select")
+                    .options(options)
+                    .build());
+        }
+
+        return AiResponseContent.builder()
+                .message(text)
+                .questions(questions)
+                .build();
+    }
+
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    private static class AiResponseContent {
+        private String message;
+        private List<QuestionContent> questions;
+
+        @lombok.Data
+        @lombok.Builder
+        @lombok.NoArgsConstructor
+        @lombok.AllArgsConstructor
+        public static class QuestionContent {
+            private String title;
+            private String type;
+            private List<String> options;
+        }
     }
 
     private AiChatSessionDocument resolveSession(String userId, String sessionId) {
@@ -230,7 +345,8 @@ public class DiagramChatServiceImpl implements DiagramChatService {
             String chatSessionId,
             String content,
             String modelName,
-            List<AiSourceDocument> sources
+            List<AiSourceDocument> sources,
+            List<AiChatMessageDocument.QuestionData> questions
     ) {
         chatMessageRepository.save(
                 AiChatMessageDocument.builder()
@@ -240,6 +356,7 @@ public class DiagramChatServiceImpl implements DiagramChatService {
                         .content(content)
                         .mode(CHAT_MODE)
                         .modelName(modelName)
+                        .questions(questions)
                         .sources(sources)
                         .createdAt(LocalDateTime.now())
                         .build()

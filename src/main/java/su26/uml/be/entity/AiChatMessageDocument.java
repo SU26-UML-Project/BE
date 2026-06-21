@@ -34,7 +34,20 @@ public class AiChatMessageDocument {
 
     String modelName;
 
+    List<QuestionData> questions;
+
     List<AiSourceDocument> sources;
 
     LocalDateTime createdAt;
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Builder
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    public static class QuestionData {
+        String title;
+        String type;
+        List<String> options;
+    }
 }
