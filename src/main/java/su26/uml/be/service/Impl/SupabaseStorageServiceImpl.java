@@ -12,8 +12,11 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import su26.uml.be.config.storage.SupabaseProperties;
+import su26.uml.be.dto.response.FileUploadResponse;
+import su26.uml.be.dto.response.SignedUrlResponse;
 import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
+import su26.uml.be.repository.UserRepository;
 import su26.uml.be.service.SupabaseStorageService;
 
 import java.io.IOException;
@@ -33,32 +36,42 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
 
     WebClient supabaseWebClient;
     SupabaseProperties supabaseProperties;
+    UserRepository userRepository;
 
-    static final String BUCKET_AVATARS = "avatars";     // public
-    static final String BUCKET_DOCUMENTS = "documents";  // private
+    static String BUCKET_AVATARS = "avatars";     // public
+    static String BUCKET_DOCUMENTS = "documents";  // private
 
-    static final long MAX_AVATAR_SIZE = 2L * 1024 * 1024;   // 2 MB
-    static final long MAX_DOCUMENT_SIZE = 10L * 1024 * 1024; // 10 MB
-    static final Set<String> ALLOWED_IMAGE_TYPES =
+    static long MAX_AVATAR_SIZE = 2L * 1024 * 1024;   // 2 MB
+    static long MAX_DOCUMENT_SIZE = 10L * 1024 * 1024; // 10 MB
+    static Set<String> ALLOWED_IMAGE_TYPES =
             Set.of(MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE, "image/webp");
-    static final String PDF_TYPE = MediaType.APPLICATION_PDF_VALUE;
+    static String PDF_TYPE = MediaType.APPLICATION_PDF_VALUE;
 
     @Override
-    public String uploadAvatar(MultipartFile file, String userId) {
+    public FileUploadResponse uploadAvatar(MultipartFile file, String email) {
         validate(file, ALLOWED_IMAGE_TYPES, MAX_AVATAR_SIZE);
+        String userId = resolveUserId(email);
         String path = buildObjectPath(userId, file.getOriginalFilename());
         upload(BUCKET_AVATARS, path, file);
-        // avatars bucket is public → return the public URL
-        return buildPublicUrl(BUCKET_AVATARS, path);
+        // avatars bucket is public → trả về public URL + path đã upload
+        return FileUploadResponse.builder()
+                .bucket(BUCKET_AVATARS)
+                .path(path)
+                .url(buildPublicUrl(BUCKET_AVATARS, path))
+                .build();
     }
 
     @Override
-    public String uploadDocument(MultipartFile file, String userId) {
+    public FileUploadResponse uploadDocument(MultipartFile file, String email) {
         validate(file, Set.of(PDF_TYPE), MAX_DOCUMENT_SIZE);
+        String userId = resolveUserId(email);
         String path = buildObjectPath(userId, file.getOriginalFilename());
         upload(BUCKET_DOCUMENTS, path, file);
-        // documents bucket is private → persist the path; access goes through a signed URL
-        return path;
+        // documents bucket is private → chỉ trả path để lưu DB; truy cập qua signed URL
+        return FileUploadResponse.builder()
+                .bucket(BUCKET_DOCUMENTS)
+                .path(path)
+                .build();
     }
 
     @Override
@@ -104,7 +117,7 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
     }
 
     @Override
-    public String getSignedUrl(String path, int expiresInSeconds) {
+    public SignedUrlResponse getSignedUrl(String path, int expiresInSeconds) {
         if (!StringUtils.hasText(path)) {
             throw new AppException(ErrorCode.FILE_PATH_REQUIRED);
         }
@@ -123,7 +136,10 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
                 throw new AppException(ErrorCode.SIGNED_URL_FAILED);
             }
             // signedUrl is relative (e.g. "/object/sign/...") → prefix with the Storage base URL
-            return supabaseProperties.url() + "/storage/v1" + result.signedUrl();
+            return SignedUrlResponse.builder()
+                    .signedUrl(supabaseProperties.url() + "/storage/v1" + result.signedUrl())
+                    .expiresInSeconds(expiresInSeconds)
+                    .build();
         } catch (WebClientResponseException e) {
             log.error("Supabase signed-url failed for path '{}': {} {}", path, e.getStatusCode(),
                     e.getResponseBodyAsString());
@@ -153,6 +169,14 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
     }
 
     // ─── Internals ──────────────────────────────────────
+
+    /** Resolve the storage owner id from the authenticated user's email. */
+    private String resolveUserId(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED))
+                .getId()
+                .toString();
+    }
 
     /** Read a MultipartFile and delegate to {@link #uploadBytes}. */
     private void upload(String bucket, String path, MultipartFile file) {

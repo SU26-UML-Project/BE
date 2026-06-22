@@ -1,13 +1,15 @@
 package su26.uml.be.service;
 
 import org.springframework.web.multipart.MultipartFile;
+import su26.uml.be.dto.response.FileUploadResponse;
+import su26.uml.be.dto.response.SignedUrlResponse;
 
 public interface SupabaseStorageService {
-    String uploadAvatar(MultipartFile file, String userId);
-    String uploadDocument(MultipartFile file, String userId);
+    FileUploadResponse uploadAvatar(MultipartFile file, String email);
+    FileUploadResponse uploadDocument(MultipartFile file, String email);
 
     String uploadAvatarFromUrl(String imageUrl, String userId);
 
-    String getSignedUrl(String path, int expiresInSeconds);
+    SignedUrlResponse getSignedUrl(String path, int expiresInSeconds);
     void deleteFile(String bucket, String path);
 }

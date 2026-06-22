@@ -2,7 +2,6 @@ package su26.uml.be.service.Impl;
 
 import java.util.List;
 import java.util.UUID;
-import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +20,7 @@ import su26.uml.be.entity.User;
 import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.mapper.ProjectMapper;
+import su26.uml.be.mapper.ProjectVersionMapper;
 import su26.uml.be.repository.ProjectRepository;
 import su26.uml.be.repository.ProjectVersionRepository;
 import su26.uml.be.repository.UserRepository;
@@ -36,6 +36,7 @@ public class ProjectServiceImpl implements ProjectService {
     UserRepository userRepository;
     ProjectVersionRepository projectVersionRepository;
     ProjectMapper projectMapper;
+    ProjectVersionMapper projectVersionMapper;
 
     @Override
     public ApiResponse<ProjectResponse> createProject(String email, ProjectRequest request) {
@@ -68,18 +69,25 @@ public class ProjectServiceImpl implements ProjectService {
     @Override
     public ApiResponse<Void> deleteProject(DeleteProjectRequest request, String email) {
         List<Project> projects = projectRepository.findAllByIdIn(request.getIds());
-        
+
+        // Guard: mọi id yêu cầu phải tồn tại (findAllByIdIn bỏ qua id không có → size lệch)
+        if (projects.size() != request.getIds().size()) {
+            throw new AppException(ErrorCode.PROJECT_NOT_FOUND);
+        }
+
         for (Project project : projects) {
+            if (project.isDeleted()) {
+                throw new AppException(ErrorCode.PROJECT_NOT_FOUND);
+            }
             if (!project.getUser().getEmail().equals(email)) {
                 throw new AppException(ErrorCode.PROJECT_ACCESS_DENIED);
             }
-            
+
             saveProjectVersion(project);
-            
-            project.setDeleted(true);
-            project.setUpdatedAt(LocalDateTime.now());
+
+            project.setDeleted(true); // updated_at được @UpdateTimestamp tự cập nhật
         }
-        
+
         projectRepository.saveAll(projects);
         
         log.info("Bulk soft-deleted {} projects by user: {}", projects.size(), email);
@@ -120,12 +128,7 @@ public class ProjectServiceImpl implements ProjectService {
                 .map(ProjectVersion::getVersionNumber)
                 .orElse(0);
 
-        ProjectVersion version = ProjectVersion.builder()
-                .project(project)
-                .projectSnapshot(project.getProjectData())
-                .versionNumber(lastVersion + 1)
-                .build();
-        
+        ProjectVersion version = projectVersionMapper.toProjectVersion(project, lastVersion + 1);
         projectVersionRepository.save(version);
     }
 }

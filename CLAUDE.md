@@ -67,7 +67,8 @@ BE/
     │   │                                       forgot-password, verify-otp, reset-password,
     │   │                                       GET (list, ADMIN), GET /{userId} (ADMIN)
     │   ├── AdminController.java             — Admin-only user management (@PreAuthorize ROLE_ADMIN)
-    │   └── FileController.java              — /files: POST avatar, POST documents, GET documents/signed-url (Supabase Storage)
+    │   ├── FileController.java              — /files: POST avatar, POST documents, GET documents/signed-url (Supabase Storage)
+    │   └── ProjectController.java           — /projects: POST create, GET list, GET /{id}, PATCH /{id}, DELETE (bulk soft-delete). Thin; delegates to ProjectService (owner = authenticated email)
     ├── dto/
     │   ├── request/
     │   │   ├── LoginRequest.java
@@ -102,7 +103,9 @@ BE/
     │   ├── UserMapper.java                  — MapStruct: UserRegisterRequest→User, User→{UserResponse, MeResponse},
     │   │                                       updateUser/completeProfile (@MappingTarget), toDeleteAccountResponse.
     │   │                                       MeResponse.profileCompleted maps from User.profile_completed (see §4 onboarding)
-    │   └── OAuth2UserMapper.java            — MapStruct: OAuth2UserInfo→User, updateGoogleFields (@MappingTarget)
+    │   ├── OAuth2UserMapper.java            — MapStruct: OAuth2UserInfo→User, updateGoogleFields (@MappingTarget)
+    │   ├── ProjectMapper.java               — MapStruct: ProjectRequest→Project, Project→ProjectResponse (userId←user.id), list, updateProject (@MappingTarget, IGNORE nulls)
+    │   └── ProjectVersionMapper.java        — MapStruct: (Project, versionNumber)→ProjectVersion snapshot (projectSnapshot←project.projectData; id/createdAt/updatedAt ignored)
     ├── repository/
     │   ├── UserRepository.java
     │   ├── RoleRepository.java              — + findByRoleName(String)
@@ -117,7 +120,7 @@ BE/
         ├── CustomOAuth2UserService.java     — Interface: Google profile → find/create User
         ├── EmailService.java                — Interface: OTP emails + account-setup-success email (HTML, branded, VN)
         ├── OtpService.java                  — Interface: Redis OTP storage/verify for password reset
-        ├── SupabaseStorageService.java      — Interface: upload avatar/document, signed URLs (Supabase Storage REST)
+        ├── SupabaseStorageService.java      — Interface: upload avatar/document (by authenticated email → returns FileUploadResponse), signed URLs (→ SignedUrlResponse), Supabase Storage REST. Impl injects UserRepository to resolve email→userId.
         └── Impl/
             ├── AuthenticationServiceImpl.java
             ├── TokenBlacklistServiceImpl.java
@@ -131,12 +134,13 @@ BE/
             └── UserServiceImpl.java
 ```
 
-> **Note — `FileController` layering deviation:** unlike the other controllers (which are thin
-> and delegate entirely to a `*Service`), `FileController` injects `UserRepository` directly and
-> contains business logic (`currentUserId()` lookup, `pathFromPublicUrl()` URL parsing, and
-> hand-built `FileUploadResponse`/`SignedUrlResponse` via `.builder()`). This is a known
-> inconsistency with Rule 12/18 — see §7. Prefer moving identity resolution + response assembly
-> into `SupabaseStorageService` for new file features.
+> **Note — `FileController` is now thin (deviation resolved):** like every other controller it
+> only delegates to its `*Service`. Identity resolution (email → `userId`) and response assembly
+> live in `SupabaseStorageService`: `uploadAvatar`/`uploadDocument` take the authenticated
+> **email** and return a fully-built `FileUploadResponse`; `getSignedUrl` returns a
+> `SignedUrlResponse`. `SupabaseStorageServiceImpl` injects `UserRepository` for the lookup.
+> Building those two response DTOs inside the service is acceptable (their source is a plain
+> `String` from storage, no JPA entity to map) — see Rule 21.
 
 ---
 
@@ -512,6 +516,6 @@ http://localhost:8088/api/uml/login/oauth2/code/google
 
 20. **Auth-failure responses return a clean 401 UNAUTHENTICATED.** `GlobalExceptionHandler` now has `@ExceptionHandler(AuthenticationException.class)` → `ErrorCode.UNAUTHENTICATED` (and an `AccessDeniedException` → `UNAUTHORIZED` handler), fully replacing the disabled `JwtAuthenticationEntryPoint`. A raw `JwtException` thrown outside an `AuthenticationException` still falls through to the catch-all 500, so wrap token-parse failures in an `AuthenticationException` (or `AppException`) where possible.
 
-21. **Controllers must be thin — delegate to a `*Service`; do not inject repositories.** `currentUserId(userDetails)` resolution, URL/path parsing, and response assembly belong in the service layer (every controller except `FileController` follows this). `FileController` is a **known deviation** (injects `UserRepository`, hand-builds `FileUploadResponse`/`SignedUrlResponse`) — do not copy its shape; for new file features push that logic into `SupabaseStorageService`. Note: hand-building those two response DTOs is borderline vs Rule 18 because their source is a plain `String` from storage (no JPA entity to map), but the layering point above still applies.
+21. **Controllers must be thin — delegate to a `*Service`; do not inject repositories.** Identity resolution (email → `userId`), URL/path parsing, and response assembly belong in the service layer — **every** controller now follows this (including `FileController`, refactored: it injects only `SupabaseStorageService`, passes `userDetails.getUsername()` down, and the service resolves the user + returns the response DTO). Do not inject a repository into a controller or hand-build a response there. Note: building `FileUploadResponse`/`SignedUrlResponse` inside `SupabaseStorageService` is acceptable vs Rule 18 because their source is a plain `String` from storage (no JPA entity to map).
 
 22. **Onboarding completion is the explicit `User.profile_completed` BOOLEAN column.** Set it on every creation path (register/admin `true`, fresh Google user `false`, onboarding `true`); it maps straight onto `MeResponse.profileCompleted` and the guard in `completeProfile` is `Boolean.TRUE.equals(...)`. Do NOT reintroduce a password-based heuristic — fresh Google users may carry a random BCrypt hash, so `password != null` is not a reliable "completed" signal (this was the bug that sent first-time Google users straight to the dashboard). Still re-validate password match + strength (≥ medium, length ≥ 8) on the server, and never put a plaintext password in any email.
