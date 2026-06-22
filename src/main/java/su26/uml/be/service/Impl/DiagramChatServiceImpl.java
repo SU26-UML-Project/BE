@@ -1,28 +1,5 @@
 package su26.uml.be.service.Impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import su26.uml.be.config.anythingllm.AnythingLlmClient;
-import su26.uml.be.config.anythingllm.AnythingLlmProperties;
-import su26.uml.be.dto.request.DiagramChatRequest;
-import su26.uml.be.dto.response.AnythingLlmChatResponse;
-import su26.uml.be.dto.response.ChatSessionResponse;
-import su26.uml.be.dto.response.DiagramChatHistoryResponse;
-import su26.uml.be.dto.response.DiagramChatResponse;
-import su26.uml.be.exception.AppException;
-import su26.uml.be.exception.ErrorCode;
-import su26.uml.be.entity.AiChatMessageDocument;
-import su26.uml.be.entity.AiChatSessionDocument;
-import su26.uml.be.entity.AiSourceDocument;
-import su26.uml.be.repository.AiChatMessageMongoRepository;
-import su26.uml.be.repository.AiChatSessionMongoRepository;
-import su26.uml.be.service.DiagramChatService;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -30,6 +7,31 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import lombok.RequiredArgsConstructor;
+import su26.uml.be.config.anythingllm.AnythingLlmClient;
+import su26.uml.be.config.anythingllm.AnythingLlmProperties;
+import su26.uml.be.dto.request.DiagramChatRequest;
+import su26.uml.be.dto.response.AnythingLlmChatResponse;
+import su26.uml.be.dto.response.ChatSessionResponse;
+import su26.uml.be.dto.response.DiagramChatHistoryResponse;
+import su26.uml.be.dto.response.DiagramChatResponse;
+import su26.uml.be.entity.AiChatMessageDocument;
+import su26.uml.be.entity.AiChatSessionDocument;
+import su26.uml.be.entity.AiSourceDocument;
+import su26.uml.be.exception.AppException;
+import su26.uml.be.exception.ErrorCode;
+import su26.uml.be.repository.AiChatMessageMongoRepository;
+import su26.uml.be.repository.AiChatSessionMongoRepository;
+import su26.uml.be.service.DiagramChatService;
 
 @Service
 @RequiredArgsConstructor
@@ -58,12 +60,8 @@ public class DiagramChatServiceImpl implements DiagramChatService {
         try {
             AiChatSessionDocument session = resolveSession(userId, request.getSessionId());
 
-            List<AiChatMessageDocument> recentMessages = getRecentMessages(session.getId());
-
-            String prompt = buildPrompt(request.getMessage(), recentMessages);
-
             AnythingLlmChatResponse anythingResponse = callAnythingLlmWithRetry(
-                    prompt,
+                    request.getMessage(),
                     session.getAnythingSessionId()
             );
 
@@ -175,15 +173,27 @@ public class DiagramChatServiceImpl implements DiagramChatService {
 
     private AiResponseContent parseAiResponse(String rawAnswer) {
         String cleanedJson = rawAnswer.trim();
-        
-        // Loại bỏ markdown code blocks nếu có
-        if (cleanedJson.startsWith("```")) {
-            cleanedJson = cleanedJson.replaceAll("^```[a-z]*\\n?", "").replaceAll("\\n?```$", "").trim();
+
+        // 1. Cố gắng tìm JSON block trong markdown if any
+        Pattern jsonPattern = Pattern.compile("(?s)```(?:json)?\\s*(\\{.*?\\})\\s*```");
+        Matcher matcher = jsonPattern.matcher(cleanedJson);
+        if (matcher.find()) {
+            cleanedJson = matcher.group(1).trim();
+        } else {
+            // 2. Nếu không có code block, cố gắng tìm cặp dấu ngoặc {} đầu tiên và cuối cùng
+            int firstBrace = cleanedJson.indexOf('{');
+            int lastBrace = cleanedJson.lastIndexOf('}');
+            if (firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace) {
+                cleanedJson = cleanedJson.substring(firstBrace, lastBrace + 1).trim();
+            }
         }
+
+        // 3. Tự động sửa các lỗi JSON phổ biến của AI
+        cleanedJson = fixAiJson(cleanedJson);
 
         try {
             AiResponseContent content = objectMapper.readValue(cleanedJson, AiResponseContent.class);
-            
+
             // Xử lý từng câu hỏi trong danh sách
             if (content.getQuestions() != null) {
                 for (AiResponseContent.QuestionContent q : content.getQuestions()) {
@@ -198,45 +208,32 @@ public class DiagramChatServiceImpl implements DiagramChatService {
             } else {
                 content.setQuestions(Collections.emptyList());
             }
-            
+
             return content;
         } catch (JsonProcessingException e) {
-            // Fallback: Smart Parse nếu không phải JSON
-            return smartParseBulletPoints(rawAnswer);
+            // Fallback: Trả về text thuần nếu không phải JSON
+            return AiResponseContent.builder()
+                    .message(rawAnswer)
+                    .questions(Collections.emptyList())
+                    .build();
         }
     }
 
     /**
-     * Tự động quét các bullet points trong text để biến thành QuestionBox
+     * Tự động sửa lỗi JSON phổ biến: thiếu dấu phẩy, dấu ngoặc kép thông minh...
      */
-    private AiResponseContent smartParseBulletPoints(String text) {
-        List<AiResponseContent.QuestionContent> questions = new ArrayList<>();
-        
-        // Regex tìm các dòng bắt đầu bằng -, *, + hoặc số thứ tự
-        Pattern bulletPattern = Pattern.compile("^[\\s]*[-*+•][\\s]+(.*)$|^[\\s]*[0-9]+\\.[\\s]+(.*)$", Pattern.MULTILINE);
-        Matcher matcher = bulletPattern.matcher(text);
-        
-        List<String> options = new ArrayList<>();
-        while (matcher.find()) {
-            String option = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
-            if (option != null && !option.trim().isEmpty()) {
-                options.add(option.trim());
-            }
-        }
+    private String fixAiJson(String json) {
+        if (json == null || json.isEmpty()) return json;
 
-        if (!options.isEmpty()) {
-            options.add("Khác");
-            questions.add(AiResponseContent.QuestionContent.builder()
-                    .title("Vui lòng chọn hoặc bổ sung thông tin:")
-                    .type("single_select")
-                    .options(options)
-                    .build());
-        }
-
-        return AiResponseContent.builder()
-                .message(text)
-                .questions(questions)
-                .build();
+        return json
+            // Thay thế dấu ngoặc kép thông minh “ ” và ‘ ’ bằng "
+            .replace("“", "\"").replace("”", "\"")
+            .replace("‘", "\"").replace("’", "\"")
+            // Sửa lỗi thiếu dấu phẩy giữa các trường (ví dụ: "field1": "val" "field2": "val")
+            .replaceAll("(\\\"\\s*:\\s*\\\"[^\\\"]*\\\")\\s*(\\\"\\s*[a-zA-Z0-9_]+\\\"\\s*:)", "$1, $2")
+            // Sửa lỗi thiếu dấu phẩy sau mảng (ví dụ: "options": [...] "next_field": ...)
+            .replaceAll("(])\\s*(\\\"\\s*[a-zA-Z0-9_]+\\\"\\s*:)", "$1, $2")
+            .trim();
     }
 
     @lombok.Data
@@ -287,7 +284,7 @@ public class DiagramChatServiceImpl implements DiagramChatService {
         for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
             try {
                 AnythingLlmChatResponse response =
-                        anythingLlmClient.chat(prompt, sessionId, CHAT_MODE);
+                        anythingLlmClient.chat(prompt, sessionId);
 
                 if (response == null) {
                     throw new AppException(ErrorCode.ANYTHING_LLM_ERROR);
@@ -363,59 +360,6 @@ public class DiagramChatServiceImpl implements DiagramChatService {
         );
     }
 
-    private List<AiChatMessageDocument> getRecentMessages(String chatSessionId) {
-        List<AiChatMessageDocument> messages =
-                chatMessageRepository.findTop10ByChatSessionIdOrderByCreatedAtDesc(chatSessionId);
-
-        List<AiChatMessageDocument> orderedMessages = new ArrayList<>(messages);
-        Collections.reverse(orderedMessages);
-
-        return orderedMessages;
-    }
-
-    private String buildPrompt(String userMessage, List<AiChatMessageDocument> recentMessages) {
-        String conversationHistory = buildConversationHistory(recentMessages);
-
-        return """
-                Bạn là trợ lý tư vấn UML Diagram và SDLC.
-
-                Quy tắc trả lời:
-                - Người dùng hỏi gì thì trả lời đúng trọng tâm câu đó.
-                - Không trả lời lan man.
-                - Không tự suy diễn nếu thiếu thông tin.
-                - Nếu người dùng hỏi tiếp bằng câu ngắn như "giải thích lý do", "vì sao", "nói rõ hơn", "cái đó là gì", "vậy nên dùng gì", hãy hiểu theo ngữ cảnh của lịch sử hội thoại gần nhất.
-                - Chỉ yêu cầu người dùng bổ sung thông tin nếu cả tin nhắn hiện tại và lịch sử hội thoại đều không đủ để kết luận.
-                - Nếu người dùng hỏi lý do, hãy giải thích lý do dựa trên câu trả lời gần nhất.
-                - Nếu đủ thông tin, hãy đề xuất diagram phù hợp và nói ngắn gọn mục đích sử dụng.
-                - Trả lời bằng tiếng Việt.
-                - Không hiển thị nội dung trong thẻ <think>.
-                - Chỉ trả về câu trả lời cuối cùng.
-
-                Lịch sử hội thoại gần nhất:
-                %s
-
-                Tin nhắn hiện tại của người dùng:
-                %s
-                """.formatted(conversationHistory, userMessage);
-    }
-
-    private String buildConversationHistory(List<AiChatMessageDocument> messages) {
-        if (messages == null || messages.isEmpty()) {
-            return "Chưa có lịch sử hội thoại.";
-        }
-
-        StringBuilder builder = new StringBuilder();
-
-        for (AiChatMessageDocument message : messages) {
-            builder.append(message.getRole())
-                    .append(": ")
-                    .append(message.getContent())
-                    .append("\n");
-        }
-
-        return builder.toString();
-    }
-
     private String cleanAnswer(String answer) {
         if (answer == null) {
             return "";
@@ -423,6 +367,8 @@ public class DiagramChatServiceImpl implements DiagramChatService {
 
         return answer
                 .replaceAll("(?s)<think>.*?</think>", "")
+                .replaceAll("\\[END CONTEXT \\d+\\]", "") // Xóa markers của AnythingLLM
+                .replaceAll("\\[\\d+\\]", "")             // Xóa các trích dẫn [1], [2]...
                 .trim();
     }
 

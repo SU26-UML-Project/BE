@@ -1,20 +1,20 @@
 package su26.uml.be.config.anythingllm;
 
-import lombok.RequiredArgsConstructor;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
-import su26.uml.be.dto.response.AnythingLlmChatResponse;
 
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import su26.uml.be.dto.response.AnythingLlmChatResponse;
 
 @Component
 @RequiredArgsConstructor
@@ -24,12 +24,15 @@ public class AnythingLlmClient {
     private final AnythingLlmProperties properties;
 
     // ─── Chat (existing) ─────────────────────────────────────────
-    public AnythingLlmChatResponse chat(String message, String sessionId, String mode) {
+    public AnythingLlmChatResponse chat(String message, String sessionId) {
         Map<String, Object> body = new HashMap<>();
         body.put("message", message);
-        body.put("mode", mode);
+        body.put("mode", "chat"); 
         body.put("sessionId", sessionId);
-        body.put("reset", false);
+
+        // In ra log để bạn kiểm tra (xem trong console IDE)
+        System.out.println("Gửi tới AnythingLLM Workspace: " + properties.workspaceSlug());
+        System.out.println("Body: " + body);
 
         return anythingLlmWebClient.post()
                 .uri("/v1/workspace/{slug}/chat", properties.workspaceSlug())
