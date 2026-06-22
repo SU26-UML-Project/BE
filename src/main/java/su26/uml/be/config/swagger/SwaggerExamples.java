@@ -224,4 +224,58 @@ public final class SwaggerExamples {
                 "expiresInSeconds": 3600
               }
             }""";
+
+    // ─── Projects ───────────────────────────────────────
+    public static final String PROJECT_REQUEST = """
+            {
+              "projectName": "My UML Project",
+              "description": "Class diagram for the order module",
+              "projectData": "<mxGraphModel>...</mxGraphModel>"
+            }""";
+
+    public static final String PROJECT_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Tạo dự án thành công",
+              "result": {
+                "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "projectName": "My UML Project",
+                "description": "Class diagram for the order module",
+                "userId": "9f1c2a3b-5717-4562-b3fc-2c963f66afa6",
+                "projectData": "<mxGraphModel>...</mxGraphModel>",
+                "createdAt": "2026-06-22T10:15:30",
+                "updatedAt": "2026-06-22T10:15:30"
+              }
+            }""";
+
+    public static final String PROJECT_LIST_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Lấy danh sách dự án thành công",
+              "result": [
+                {
+                  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                  "projectName": "My UML Project",
+                  "description": "Class diagram for the order module",
+                  "userId": "9f1c2a3b-5717-4562-b3fc-2c963f66afa6",
+                  "projectData": "<mxGraphModel>...</mxGraphModel>",
+                  "createdAt": "2026-06-22T10:15:30",
+                  "updatedAt": "2026-06-22T10:15:30"
+                }
+              ]
+            }""";
+
+    public static final String DELETE_PROJECT_REQUEST = """
+            {
+              "ids": [
+                "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "9f1c2a3b-5717-4562-b3fc-2c963f66afa6"
+              ]
+            }""";
+
+    public static final String DELETE_PROJECT_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Xóa các dự án thành công"
+            }""";
 }

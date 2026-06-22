@@ -20,7 +20,7 @@ import su26.uml.be.enums.UserStatus;
 import su26.uml.be.repository.RoleRepository;
 import su26.uml.be.repository.UserRepository;
 import su26.uml.be.service.AuthenticationService;
-import su26.uml.be.service.SupabaseStorageService;
+import su26.uml.be.service.StorageService;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -37,7 +37,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     RoleRepository roleRepository;
     AuthenticationService authenticationService;
     CookieUtils cookieUtils;
-    SupabaseStorageService supabaseStorageService;
+    StorageService storageService;
     PasswordEncoder passwordEncoder;
 
     @NonFinal
@@ -109,7 +109,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         if (!shouldMirror) return;
 
         try {
-            String supabaseUrl = supabaseStorageService.uploadAvatarFromUrl(googlePictureUrl, user.getId().toString());
+            String supabaseUrl = storageService.uploadAvatarFromUrl(googlePictureUrl, user.getId().toString());
             user.setAvatarUrl(supabaseUrl);
             userRepository.save(user);
             log.info("Đã đồng bộ avatar Google sang Supabase cho {}", user.getEmail());
