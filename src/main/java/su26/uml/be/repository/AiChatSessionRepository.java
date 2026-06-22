@@ -6,7 +6,7 @@ import su26.uml.be.entity.AiChatSessionDocument;
 import java.util.List;
 import java.util.Optional;
 
-public interface AiChatSessionMongoRepository
+public interface AiChatSessionRepository
         extends MongoRepository<AiChatSessionDocument, String> {
 
     Optional<AiChatSessionDocument>

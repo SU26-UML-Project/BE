@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -20,17 +19,16 @@ import lombok.RequiredArgsConstructor;
 import su26.uml.be.config.anythingllm.AnythingLlmClient;
 import su26.uml.be.config.anythingllm.AnythingLlmProperties;
 import su26.uml.be.dto.request.DiagramChatRequest;
-import su26.uml.be.dto.response.AnythingLlmChatResponse;
-import su26.uml.be.dto.response.ChatSessionResponse;
-import su26.uml.be.dto.response.DiagramChatHistoryResponse;
-import su26.uml.be.dto.response.DiagramChatResponse;
+import su26.uml.be.dto.response.*;
 import su26.uml.be.entity.AiChatMessageDocument;
 import su26.uml.be.entity.AiChatSessionDocument;
 import su26.uml.be.entity.AiSourceDocument;
+import su26.uml.be.entity.User;
 import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
-import su26.uml.be.repository.AiChatMessageMongoRepository;
-import su26.uml.be.repository.AiChatSessionMongoRepository;
+import su26.uml.be.repository.AiChatMessageRepository;
+import su26.uml.be.repository.AiChatSessionRepository;
+import su26.uml.be.repository.UserRepository;
 import su26.uml.be.service.DiagramChatService;
 
 @Service
@@ -41,20 +39,23 @@ public class DiagramChatServiceImpl implements DiagramChatService {
     private static final String ROLE_ASSISTANT = "ASSISTANT";
     private static final String CHAT_MODE = "chat";
     private static final String SESSION_STATUS_ACTIVE = "ACTIVE";
-    private static final String DEFAULT_SESSION_TITLE = "UML AI Chat";
+    private static final String DEFAULT_SESSION_TITLE = "New chat";
     private static final int SOURCE_SNIPPET_MAX_LENGTH = 500;
     private static final int MAX_RETRY_ATTEMPTS = 2;
     private static final long RETRY_DELAY_MILLIS = 800L;
 
     private final AnythingLlmClient anythingLlmClient;
     private final AnythingLlmProperties anythingLlmProperties;
-    private final AiChatSessionMongoRepository chatSessionRepository;
-    private final AiChatMessageMongoRepository chatMessageRepository;
+    private final AiChatSessionRepository chatSessionRepository;
+    private final AiChatMessageRepository chatMessageRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final UserRepository userRepository;
 
     @Override
-    public DiagramChatResponse chat(String userId, DiagramChatRequest request) {
-        validateUserId(userId);
+    public ApiResponse<DiagramChatResponse> chat(String email, DiagramChatRequest request) {
+        User user = getCurrentUser(email);
+        String userId = user.getId().toString();
+
         validateChatRequest(request);
 
         try {
@@ -71,8 +72,9 @@ public class DiagramChatServiceImpl implements DiagramChatService {
                 throw new AppException(ErrorCode.ANYTHING_LLM_ERROR);
             }
 
-            // Parse JSON from AI
             AiResponseContent parsedContent = parseAiResponse(rawAnswer);
+
+            updateSessionTitleIfNeeded(session, request.getMessage());
 
             List<AiSourceDocument> sourceDocuments = mapSources(anythingResponse.getSources());
 
@@ -90,13 +92,13 @@ public class DiagramChatServiceImpl implements DiagramChatService {
                                     .type(q.getType())
                                     .options(q.getOptions())
                                     .build())
-                            .collect(Collectors.toList())
+                            .toList()
             );
 
             session.setUpdatedAt(LocalDateTime.now());
             chatSessionRepository.save(session);
 
-            return DiagramChatResponse.builder()
+            DiagramChatResponse response = DiagramChatResponse.builder()
                     .answer(parsedContent.getMessage())
                     .questions(parsedContent.getQuestions().stream()
                             .map(q -> DiagramChatResponse.QuestionResponse.builder()
@@ -104,10 +106,12 @@ public class DiagramChatServiceImpl implements DiagramChatService {
                                     .type(q.getType())
                                     .options(q.getOptions())
                                     .build())
-                            .collect(Collectors.toList()))
+                            .toList())
                     .sessionId(session.getAnythingSessionId())
                     .sources(anythingResponse.getSources() == null ? List.of() : anythingResponse.getSources())
                     .build();
+
+            return ApiResponse.success("Chat successfully", response);
 
         } catch (AppException exception) {
             throw exception;
@@ -117,27 +121,35 @@ public class DiagramChatServiceImpl implements DiagramChatService {
     }
 
     @Override
-    public ChatSessionResponse createSession(String userId) {
-        validateUserId(userId);
+    public ApiResponse<ChatSessionResponse> createSession(String email) {
+        User user = getCurrentUser(email);
+        String userId = user.getId().toString();
 
         AiChatSessionDocument session = createNewSessionDocument(userId);
 
-        return mapSessionResponse(session);
+        return ApiResponse.success(
+                "Create chat session successfully",
+                mapSessionResponse(session)
+        );
     }
 
     @Override
-    public List<ChatSessionResponse> getSessions(String userId) {
-        validateUserId(userId);
+    public ApiResponse<List<ChatSessionResponse>> getSessions(String email) {
+        User user = getCurrentUser(email);
+        String userId = user.getId().toString();
 
-        return chatSessionRepository.findByUserIdOrderByUpdatedAtDesc(userId)
+        List<ChatSessionResponse> response = chatSessionRepository.findByUserIdOrderByUpdatedAtDesc(userId)
                 .stream()
                 .map(this::mapSessionResponse)
                 .toList();
+
+        return ApiResponse.success("Get chat sessions successfully", response);
     }
 
     @Override
-    public DiagramChatHistoryResponse getHistory(String userId, String sessionId) {
-        validateUserId(userId);
+    public ApiResponse<DiagramChatHistoryResponse> getHistory(String email, String sessionId) {
+        User user = getCurrentUser(email);
+        String userId = user.getId().toString();
 
         if (sessionId == null || sessionId.isBlank()) {
             throw new AppException(ErrorCode.CHAT_SESSION_ID_REQUIRED);
@@ -150,7 +162,7 @@ public class DiagramChatServiceImpl implements DiagramChatService {
         List<AiChatMessageDocument> messages =
                 chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(session.getId());
 
-        return DiagramChatHistoryResponse.builder()
+        DiagramChatHistoryResponse response = DiagramChatHistoryResponse.builder()
                 .sessionId(session.getAnythingSessionId())
                 .messages(messages.stream()
                         .map(message -> DiagramChatHistoryResponse.MessageItem.builder()
@@ -158,17 +170,19 @@ public class DiagramChatServiceImpl implements DiagramChatService {
                                 .content(message.getContent())
                                 .modelName(message.getModelName())
                                 .questions(message.getQuestions() == null ? List.of() : message.getQuestions().stream()
-                                        .map(q -> DiagramChatResponse.QuestionResponse.builder()
-                                                .title(q.getTitle())
-                                                .type(q.getType())
-                                                .options(q.getOptions())
-                                                .build())
-                                        .collect(Collectors.toList()))
+                                                                                        .map(q -> DiagramChatResponse.QuestionResponse.builder()
+                                                                                                  .title(q.getTitle())
+                                                                                                  .type(q.getType())
+                                                                                                  .options(q.getOptions())
+                                                                                                  .build())
+                                                                                        .toList())
                                 .createdAt(message.getCreatedAt())
                                 .build()
                         )
                         .toList())
                 .build();
+
+        return ApiResponse.success("Get chat history successfully", response);
     }
 
     private AiResponseContent parseAiResponse(String rawAnswer) {
@@ -401,10 +415,13 @@ public class DiagramChatServiceImpl implements DiagramChatService {
                 .build();
     }
 
-    private void validateUserId(String userId) {
-        if (userId == null || userId.isBlank()) {
+    private User getCurrentUser(String email) {
+        if (email == null || email.isBlank()) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
+
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
     }
 
     private void validateChatRequest(DiagramChatRequest request) {
@@ -439,5 +456,71 @@ public class DiagramChatServiceImpl implements DiagramChatService {
         }
 
         return value.substring(0, maxLength) + "...";
+    }
+
+    private void updateSessionTitleIfNeeded(AiChatSessionDocument session, String userMessage) {
+        if (session.getTitle() != null && !session.getTitle().equals(DEFAULT_SESSION_TITLE)) {
+            return;
+        }
+
+        if (isGreetingOrTooShort(userMessage)) {
+            return;
+        }
+
+        String title = generateSimpleSessionTitle(userMessage);
+
+        session.setTitle(title);
+        session.setUpdatedAt(LocalDateTime.now());
+
+        chatSessionRepository.save(session);
+    }
+
+    private String generateSimpleSessionTitle(String message) {
+        String title = message.trim()
+                .replaceAll("[\\r\\n]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        title = removeSimplePrefix(title);
+
+        int maxLength = 45;
+
+        if (title.length() <= maxLength) {
+            return title;
+        }
+
+        return title.substring(0, maxLength).trim() + "...";
+    }
+
+    private String removeSimplePrefix(String title) {
+        return title
+                .replaceFirst("(?i)^tôi muốn\\s+", "")
+                .replaceFirst("(?i)^tôi cần\\s+", "")
+                .replaceFirst("(?i)^mình muốn\\s+", "")
+                .replaceFirst("(?i)^mình cần\\s+", "")
+                .replaceFirst("(?i)^em muốn\\s+", "")
+                .replaceFirst("(?i)^em cần\\s+", "")
+                .replaceFirst("(?i)^hãy giúp tôi\\s+", "")
+                .replaceFirst("(?i)^giúp tôi\\s+", "")
+                .trim();
+    }
+
+    private boolean isGreetingOrTooShort(String message) {
+        if (message == null || message.isBlank()) {
+            return true;
+        }
+
+        String normalized = message.toLowerCase()
+                .replaceAll("[\\s,.!?;:]+", " ")
+                .trim();
+
+        return normalized.length() < 6
+                || normalized.equals("hi")
+                || normalized.equals("hello")
+                || normalized.equals("hey")
+                || normalized.equals("chào")
+                || normalized.equals("xin chào")
+                || normalized.equals("chào bạn")
+                || normalized.equals("alo");
     }
 }
