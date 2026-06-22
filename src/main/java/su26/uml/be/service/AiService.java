@@ -8,7 +8,7 @@ import su26.uml.be.dto.response.*;
 
 import java.util.List;
 
-public interface AiAdminService {
+public interface AiService {
 
     ApiResponse<AiSystemConfigResponse> getSystemConfig();
 

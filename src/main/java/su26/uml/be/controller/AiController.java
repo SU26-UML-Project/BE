@@ -14,50 +14,50 @@ import su26.uml.be.dto.request.AiDocumentDeleteRequest;
 import su26.uml.be.dto.request.AiSystemConfigRequest;
 import su26.uml.be.dto.request.AiWorkspaceUpdateRequest;
 import su26.uml.be.dto.response.*;
-import su26.uml.be.service.AiAdminService;
+import su26.uml.be.service.AiService;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/admin/ai")
+@RequestMapping("/ai")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @PreAuthorize("hasRole('ADMIN')")
 @Tag(name = "AI Admin", description = "Admin AnythingLLM configuration.")
-public class AiAdminController {
+public class AiController {
 
-    AiAdminService aiAdminService;
+    AiService aiService;
 
     @GetMapping("/config")
     @Operation(summary = "Get system config", description = "Get current LLM provider, model, vector DB settings from AnythingLLM.")
     public ApiResponse<AiSystemConfigResponse> getSystemConfig() {
-        return aiAdminService.getSystemConfig();
+        return aiService.getSystemConfig();
     }
 
     @PutMapping("/config")
     @Operation(summary = "Update system config", description = "Update LLM provider, model, vector DB settings on AnythingLLM.")
     public ApiResponse<AiSystemConfigResponse> updateSystemConfig(
             @Valid @RequestBody AiSystemConfigRequest request) {
-        return aiAdminService.updateSystemConfig(request);
+        return aiService.updateSystemConfig(request);
     }
 
     @GetMapping("/providers")
     @Operation(summary = "Get supported providers", description = "Get list of supported LLM providers from AnythingLLM.")
     public ApiResponse<List<String>> getSupportedProviders() {
-        return aiAdminService.getSupportedProviders();
+        return aiService.getSupportedProviders();
     }
 
     @PostMapping("/test")
     @Operation(summary = "Test connection", description = "Ping AnythingLLM to check connectivity.")
     public ApiResponse<AiTestConnectionResponse> testConnection() {
-        return aiAdminService.testConnection();
+        return aiService.testConnection();
     }
 
     @GetMapping("/workspace")
     @Operation(summary = "Get workspace", description = "Get current workspace details including RAG settings. Optional ?slug= query param, defaults to configured workspace.")
     public ApiResponse<AiWorkspaceResponse> getWorkspace(
             @RequestParam(required = false) String slug) {
-        return aiAdminService.getWorkspaceBySlug(slug);
+        return aiService.getWorkspaceBySlug(slug);
     }
 
     @PutMapping("/workspace")
@@ -65,7 +65,7 @@ public class AiAdminController {
     public ApiResponse<AiWorkspaceResponse> updateWorkspace(
             @Valid @RequestBody AiWorkspaceUpdateRequest request,
             @RequestParam(required = false) String slug) {
-        return aiAdminService.updateWorkspace(request, slug);
+        return aiService.updateWorkspace(request, slug);
     }
 
     @GetMapping("/providers/{provider}/models")
@@ -73,20 +73,20 @@ public class AiAdminController {
     public ApiResponse<List<String>> getProviderModels(
             @PathVariable String provider,
             @RequestParam(required = false) String basePath) {
-        return aiAdminService.getProviderModels(provider, basePath);
+        return aiService.getProviderModels(provider, basePath);
     }
 
     @GetMapping("/workspaces")
     @Operation(summary = "List workspaces", description = "List all workspaces from AnythingLLM.")
     public ApiResponse<List<AiWorkspaceListItem>> getWorkspaces() {
-        return aiAdminService.getWorkspaces();
+        return aiService.getWorkspaces();
     }
 
     @GetMapping("/documents")
     @Operation(summary = "List documents", description = "List documents in a workspace. Optional ?workspace= query param, defaults to configured workspace.")
     public ApiResponse<List<AiDocumentResponse>> getDocuments(
             @RequestParam(required = false) String workspace) {
-        return aiAdminService.getDocuments(workspace);
+        return aiService.getDocuments(workspace);
     }
 
     @PostMapping(value = "/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -94,25 +94,25 @@ public class AiAdminController {
     public ApiResponse<Void> uploadDocument(
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) String workspace) {
-        return aiAdminService.uploadDocument(file, workspace);
+        return aiService.uploadDocument(file, workspace);
     }
 
     @DeleteMapping("/documents")
     @Operation(summary = "Delete document", description = "Delete a document from the system by its document name.")
     public ApiResponse<Void> deleteDocument(@Valid @RequestBody AiDocumentDeleteRequest request) {
-        return aiAdminService.deleteDocument(request);
+        return aiService.deleteDocument(request);
     }
 
     @GetMapping("/version")
     @Operation(summary = "Get AI version info", description = "Get AnythingLLM version, current LLM provider, model, and environment.")
     public ApiResponse<AiVersionResponse> getVersion() {
-        return aiAdminService.getVersion();
+        return aiService.getVersion();
     }
 
     @PostMapping("/documents/re-embed")
     @Operation(summary = "Re-embed documents", description = "Re-embed documents in a workspace. Optional ?workspace= query param, defaults to configured workspace.")
     public ApiResponse<Void> reEmbedDocuments(
             @RequestParam(required = false) String workspace) {
-        return aiAdminService.reEmbedDocuments(workspace);
+        return aiService.reEmbedDocuments(workspace);
     }
 }
