@@ -1,4 +1,4 @@
-package su26.uml.be.config;
+package su26.uml.be.config.redis;
 
 import org.springframework.boot.data.redis.autoconfigure.LettuceClientConfigurationBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
@@ -7,12 +7,6 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
-/**
- * Cấu hình Redis cho hệ thống token.
- *
- * <p>Dùng {@link StringRedisSerializer} cho cả key và value vì blacklist
- * access-token chỉ lưu cặp {@code blacklist:{jwtId} -> "1"} kèm TTL.</p>
- */
 @Configuration
 public class RedisConfig {
 

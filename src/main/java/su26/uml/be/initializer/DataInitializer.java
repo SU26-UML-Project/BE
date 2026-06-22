@@ -1,4 +1,4 @@
-package su26.uml.be.config;
+package su26.uml.be.initializer;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;

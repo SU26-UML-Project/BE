@@ -17,7 +17,7 @@ import su26.uml.be.dto.response.SignedUrlResponse;
 import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.repository.UserRepository;
-import su26.uml.be.service.SupabaseStorageService;
+import su26.uml.be.service.StorageService;
 
 import java.io.IOException;
 import java.net.URI;
@@ -32,7 +32,7 @@ import java.util.UUID;
 @Slf4j
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-public class SupabaseStorageServiceImpl implements SupabaseStorageService {
+public class StorageServiceImpl implements StorageService {
 
     WebClient supabaseWebClient;
     SupabaseProperties supabaseProperties;
