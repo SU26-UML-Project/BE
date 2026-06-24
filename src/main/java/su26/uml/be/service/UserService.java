@@ -1,12 +1,13 @@
 package su26.uml.be.service;
 
+import org.springframework.data.domain.Pageable;
 import su26.uml.be.dto.request.*;
 import su26.uml.be.dto.response.ApiResponse;
 import su26.uml.be.dto.response.DeleteAccountResponse;
 import su26.uml.be.dto.response.MeResponse;
+import su26.uml.be.dto.response.PagedResponse;
 import su26.uml.be.dto.response.UserResponse;
 
-import java.util.List;
 import java.util.UUID;
 
 public interface UserService {
@@ -15,7 +16,7 @@ public interface UserService {
     ApiResponse<UserResponse> completeProfile(String email, CompleteProfileRequest request);
     ApiResponse<DeleteAccountResponse> requestDeleteAccount(String email);
     ApiResponse<DeleteAccountResponse> restoreAccount(String email);
-    ApiResponse<List<UserResponse>> getAllUsers();
+    ApiResponse<PagedResponse<UserResponse>> getAllUsers(Pageable pageable);
     ApiResponse<UserResponse> getUserById(UUID userId);
     ApiResponse<MeResponse> getCurrentUser(String email);
     ApiResponse<UserResponse> getMyProfile(String email);

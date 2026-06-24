@@ -11,6 +11,9 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,10 +22,10 @@ import su26.uml.be.config.swagger.SwaggerExamples;
 import su26.uml.be.dto.request.*;
 import su26.uml.be.dto.response.DeleteAccountResponse;
 import su26.uml.be.dto.response.MeResponse;
+import su26.uml.be.dto.response.PagedResponse;
 import su26.uml.be.dto.response.UserResponse;
 import su26.uml.be.service.UserService;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -53,12 +56,17 @@ public class UserController {
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(
-            summary = "List all users",
-            description = "Returns every user account. Restricted to ADMIN."
+            summary = "List all users (paginated)",
+            description = "Returns a paginated and sortable list of all user accounts. Restricted to ADMIN. " +
+                    "Query params: page (0-based), size, sort (e.g. sort=createdAt,desc or sort=role.roleName,asc). " +
+                    "Defaults: page=0, size=20, sort=createdAt,desc."
     )
-    @ApiResponse(responseCode = "200", description = "User list returned.")
-    public su26.uml.be.dto.response.ApiResponse<List<UserResponse>> getAllUsers() {
-        return userService.getAllUsers();
+    @ApiResponse(responseCode = "200", description = "User list returned.",
+            content = @Content(schema = @Schema(implementation = su26.uml.be.dto.response.ApiResponse.class),
+                    examples = @ExampleObject(value = SwaggerExamples.GET_USERS_PAGED_RESPONSE)))
+    public su26.uml.be.dto.response.ApiResponse<PagedResponse<UserResponse>> getAllUsers(
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return userService.getAllUsers(pageable);
     }
 
     @GetMapping("/{userId}")

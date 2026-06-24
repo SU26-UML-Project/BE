@@ -31,6 +31,29 @@ public final class SwaggerExamples {
     public static final String ACCOUNT_STATUS_RESPONSE =
             "{\"code\":0,\"result\":{\"locked\":false}}";
 
+    // ─── Users (paginated) ──────────────────────────────
+    public static final String GET_USERS_PAGED_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Lấy danh sách người dùng thành công",
+              "result": {
+                "content": [
+                  {
+                    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                    "username": "johndoe@example.com",
+                    "fullName": "John Doe",
+                    "email": "johndoe@example.com",
+                    "status": "ACTIVE",
+                    "role": "USER"
+                  }
+                ],
+                "page": 0,
+                "size": 20,
+                "totalElements": 1,
+                "totalPages": 1
+              }
+            }""";
+
     // ─── Admin ──────────────────────────────────────────
     public static final String ADMIN_REGISTER_REQUEST = """
             {

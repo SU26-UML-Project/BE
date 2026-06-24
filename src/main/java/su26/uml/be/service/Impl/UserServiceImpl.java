@@ -4,6 +4,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +14,7 @@ import su26.uml.be.enums.UserStatus;
 import su26.uml.be.dto.response.ApiResponse;
 import su26.uml.be.dto.response.DeleteAccountResponse;
 import su26.uml.be.dto.response.MeResponse;
+import su26.uml.be.dto.response.PagedResponse;
 import su26.uml.be.dto.response.UserResponse;
 
 import java.time.LocalDateTime;
@@ -29,7 +32,6 @@ import su26.uml.be.service.UserService;
 
 
 import java.security.SecureRandom;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -176,16 +178,22 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponse<List<UserResponse>> getAllUsers() {
-        List<User> users = userRepository.findAll();
+    public ApiResponse<PagedResponse<UserResponse>> getAllUsers(Pageable pageable) {
+        Page<User> page = userRepository.findAll(pageable);
 
-        if (users.isEmpty()) {
+        if (page.isEmpty()) {
             throw new AppException(ErrorCode.USER_LIST_EMPTY);
         }
 
-        List<UserResponse> userResponses = userMapper.toUserResponseList(users);
-//        resolveAvatar(userResponses);
-        return ApiResponse.success("Lấy danh sách người dùng thành công", userResponses);
+        PagedResponse<UserResponse> pagedResponse = PagedResponse.<UserResponse>builder()
+                .content(userMapper.toUserResponseList(page.getContent()))
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .build();
+
+        return ApiResponse.success("Lấy danh sách người dùng thành công", pagedResponse);
     }
 
     @Override
