@@ -76,6 +76,9 @@ public class ProjectServiceImpl implements ProjectService {
     public ApiResponse<ProjectResponse> updateProject(UUID projectId, String email, ProjectRequest request) {
         Project project = getProjectAndValidateOwnership(projectId, email);
         projectMapper.updateProject(request, project);
+        if (request.getIsDraft() != null) {
+            project.setDraft(request.getIsDraft());
+        }
         Project updatedProject = projectRepository.save(project);
 
         return ApiResponse.success("Cập nhật dự án thành công", projectMapper.toProjectResponse(updatedProject));
