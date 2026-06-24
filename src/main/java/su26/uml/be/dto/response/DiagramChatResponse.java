@@ -19,6 +19,10 @@ public class DiagramChatResponse {
 
     List<QuestionResponse> questions;
 
+    List<CanvasActionResponse> actions;
+
+    String newState;
+
     List<Map<String, Object>> sources;
 
     @Data

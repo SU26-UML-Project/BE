@@ -16,23 +16,23 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import su26.uml.be.config.anythingllm.AnythingLlmClient;
 import su26.uml.be.config.anythingllm.AnythingLlmProperties;
 import su26.uml.be.dto.request.DiagramChatRequest;
 import su26.uml.be.dto.response.*;
-import su26.uml.be.entity.AiChatMessageDocument;
-import su26.uml.be.entity.AiChatSessionDocument;
-import su26.uml.be.entity.AiSourceDocument;
-import su26.uml.be.entity.User;
+import su26.uml.be.entity.*;
 import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.repository.AiChatMessageRepository;
 import su26.uml.be.repository.AiChatSessionRepository;
+import su26.uml.be.repository.SheetRepository;
 import su26.uml.be.repository.UserRepository;
 import su26.uml.be.service.DiagramChatService;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DiagramChatServiceImpl implements DiagramChatService {
 
     private static final String ROLE_USER = "USER";
@@ -48,6 +48,7 @@ public class DiagramChatServiceImpl implements DiagramChatService {
     private final AnythingLlmProperties anythingLlmProperties;
     private final AiChatSessionRepository chatSessionRepository;
     private final AiChatMessageRepository chatMessageRepository;
+    private final SheetRepository sheetRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final UserRepository userRepository;
 
@@ -61,8 +62,22 @@ public class DiagramChatServiceImpl implements DiagramChatService {
         try {
             AiChatSessionDocument session = resolveSession(userId, request.getSessionId());
 
+            // --- Lấy dữ liệu bản vẽ hiện tại để làm ngữ cảnh (Context) cho AI ---
+            String currentDiagramContext = "";
+            if (request.getSheetId() != null && !request.getSheetId().isBlank()) {
+                try {
+                    UUID sheetUuid = UUID.fromString(request.getSheetId());
+                    Sheet sheet = sheetRepository.findById(sheetUuid).orElse(null);
+                    if (sheet != null && sheet.getDiagramData() != null) {
+                        currentDiagramContext = "\n\nCURRENT DIAGRAM STATE (JSON): " + sheet.getDiagramData();
+                    }
+                } catch (Exception e) {
+                    log.warn("Could not fetch sheet context for AI: {}", e.getMessage());
+                }
+            }
+
             AnythingLlmChatResponse anythingResponse = callAnythingLlmWithRetry(
-                    request.getMessage(),
+                    request.getMessage() + currentDiagramContext,
                     session.getAnythingSessionId()
             );
 
@@ -73,6 +88,24 @@ public class DiagramChatServiceImpl implements DiagramChatService {
             }
 
             AiResponseContent parsedContent = parseAiResponse(rawAnswer);
+
+            // --- Logic State Merger ---
+            String updatedDiagramData = null;
+            if (request.getSheetId() != null && !request.getSheetId().isBlank()) {
+                UUID sheetUuid;
+                try {
+                    sheetUuid = UUID.fromString(request.getSheetId());
+                } catch (IllegalArgumentException e) {
+                    throw new AppException(ErrorCode.INVALID_REQUEST);
+                }
+
+                Sheet sheet = sheetRepository.findById(sheetUuid)
+                        .orElseThrow(() -> new AppException(ErrorCode.SHEET_NOT_FOUND));
+
+                updatedDiagramData = mergeState(sheet.getDiagramData(), parsedContent.getActions());
+                sheet.setDiagramData(updatedDiagramData);
+                sheetRepository.save(sheet);
+            }
 
             updateSessionTitleIfNeeded(session, request.getMessage());
 
@@ -107,6 +140,8 @@ public class DiagramChatServiceImpl implements DiagramChatService {
                                     .options(q.getOptions())
                                     .build())
                             .toList())
+                    .actions(parsedContent.getActions())
+                    .newState(updatedDiagramData)
                     .sessionId(session.getAnythingSessionId())
                     .sources(anythingResponse.getSources() == null ? List.of() : anythingResponse.getSources())
                     .build();
@@ -185,6 +220,94 @@ public class DiagramChatServiceImpl implements DiagramChatService {
         return ApiResponse.success("Get chat history successfully", response);
     }
 
+    @SuppressWarnings("unchecked")
+    private String mergeState(String currentData, List<CanvasActionResponse> actions) {
+        if (actions == null || actions.isEmpty()) {
+            return currentData;
+        }
+
+        try {
+            Map<String, Object> state;
+            if (currentData == null || currentData.isBlank() || currentData.equals("{}")) {
+                state = new java.util.HashMap<>();
+                state.put("nodes", new ArrayList<>());
+                state.put("edges", new ArrayList<>());
+            } else {
+                state = objectMapper.readValue(currentData, Map.class);
+            }
+
+            // Đảm bảo nodes và edges luôn là ArrayList để có thể modify
+            List<Map<String, Object>> nodes = new ArrayList<>((List<Map<String, Object>>) state.getOrDefault("nodes", new ArrayList<>()));
+            List<Map<String, Object>> edges = new ArrayList<>((List<Map<String, Object>>) state.getOrDefault("edges", new ArrayList<>()));
+
+            for (CanvasActionResponse action : actions) {
+                String type = action.getType();
+                Map<String, Object> data = action.getData();
+                if (data == null || type == null) continue;
+
+                String id = (String) data.get("id");
+
+                switch (type.toUpperCase()) {
+                    case "ADD_NODE" -> {
+                        if (id != null) {
+                            nodes.removeIf(node -> id.equals(node.get("id")));
+                        }
+                        nodes.add(new java.util.HashMap<>(data));
+                    }
+                    case "UPDATE_NODE" -> {
+                        if (id != null) {
+                            for (int i = 0; i < nodes.size(); i++) {
+                                if (id.equals(nodes.get(i).get("id"))) {
+                                    Map<String, Object> existingNode = new java.util.HashMap<>(nodes.get(i));
+                                    
+                                    // Xử lý merge các trường top-level (type, position...)
+                                    for (Map.Entry<String, Object> entry : data.entrySet()) {
+                                        if (entry.getKey().equals("data") && existingNode.get("data") instanceof Map) {
+                                            // Nếu là trường "data" lồng nhau, thực hiện merge sâu
+                                            Map<String, Object> existingNestedData = new java.util.HashMap<>((Map<String, Object>) existingNode.get("data"));
+                                            Map<String, Object> newNestedData = (Map<String, Object>) entry.getValue();
+                                            existingNestedData.putAll(newNestedData);
+                                            existingNode.put("data", existingNestedData);
+                                        } else if (!entry.getKey().equals("id")) {
+                                            existingNode.put(entry.getKey(), entry.getValue());
+                                        }
+                                    }
+                                    nodes.set(i, existingNode);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    case "DELETE_NODE" -> {
+                        if (id != null) {
+                            nodes.removeIf(node -> id.equals(node.get("id")));
+                            edges.removeIf(edge -> id.equals(edge.get("source")) || id.equals(edge.get("target")));
+                        }
+                    }
+                    case "ADD_EDGE" -> {
+                        if (id != null) {
+                            edges.removeIf(edge -> id.equals(edge.get("id")));
+                        }
+                        edges.add(new java.util.HashMap<>(data));
+                    }
+                    case "DELETE_EDGE" -> {
+                        if (id != null) {
+                            edges.removeIf(edge -> id.equals(edge.get("id")));
+                        }
+                    }
+                    default -> log.warn("Unknown action type: {}", type);
+                }
+            }
+
+            state.put("nodes", nodes);
+            state.put("edges", edges);
+            return objectMapper.writeValueAsString(state);
+        } catch (Exception e) {
+            log.error("Failed to merge state. Current data: {}, Actions: {}", currentData, actions, e);
+            return currentData;
+        }
+    }
+
     private AiResponseContent parseAiResponse(String rawAnswer) {
         String cleanedJson = rawAnswer.trim();
 
@@ -257,6 +380,7 @@ public class DiagramChatServiceImpl implements DiagramChatService {
     private static class AiResponseContent {
         private String message;
         private List<QuestionContent> questions;
+        private List<CanvasActionResponse> actions;
 
         @lombok.Data
         @lombok.Builder

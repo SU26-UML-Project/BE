@@ -229,8 +229,7 @@ public final class SwaggerExamples {
     public static final String PROJECT_REQUEST = """
             {
               "projectName": "My UML Project",
-              "description": "Class diagram for the order module",
-              "projectData": "<mxGraphModel>...</mxGraphModel>"
+              "description": "Class diagram for the order module"
             }""";
 
     public static final String PROJECT_RESPONSE = """
@@ -242,7 +241,15 @@ public final class SwaggerExamples {
                 "projectName": "My UML Project",
                 "description": "Class diagram for the order module",
                 "userId": "9f1c2a3b-5717-4562-b3fc-2c963f66afa6",
-                "projectData": "<mxGraphModel>...</mxGraphModel>",
+                "sheets": [
+                  {
+                    "id": "4fa85f64-5717-4562-b3fc-2c963f66afa7",
+                    "name": "Sheet 1",
+                    "orderIndex": 0,
+                    "diagramData": "{\\"nodes\\": [], \\"edges\\": []}",
+                    "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                  }
+                ],
                 "createdAt": "2026-06-22T10:15:30",
                 "updatedAt": "2026-06-22T10:15:30"
               }
@@ -258,7 +265,7 @@ public final class SwaggerExamples {
                   "projectName": "My UML Project",
                   "description": "Class diagram for the order module",
                   "userId": "9f1c2a3b-5717-4562-b3fc-2c963f66afa6",
-                  "projectData": "<mxGraphModel>...</mxGraphModel>",
+                  "sheets": [],
                   "createdAt": "2026-06-22T10:15:30",
                   "updatedAt": "2026-06-22T10:15:30"
                 }

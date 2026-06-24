@@ -1,6 +1,7 @@
 package su26.uml.be.dto.response;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -30,8 +31,8 @@ public class ProjectResponse {
     @Schema(description = "Owner ID.")
     UUID userId;
 
-    @Schema(description = "Draw.io XML data.")
-    String projectData;
+    @Schema(description = "List of sheets (tabs) in the project.")
+    List<SheetResponse> sheets;
 
     @Schema(description = "Creation timestamp.")
     LocalDateTime createdAt;

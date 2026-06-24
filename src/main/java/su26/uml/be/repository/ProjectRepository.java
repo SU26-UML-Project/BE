@@ -1,5 +1,6 @@
 package su26.uml.be.repository;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import su26.uml.be.entity.Project;
@@ -10,7 +11,11 @@ import java.util.UUID;
 
 @Repository
 public interface ProjectRepository extends JpaRepository<Project, UUID> {
+    @EntityGraph(attributePaths = {"sheets"})
     List<Project> findAllByUserAndIsDeletedFalse(User user);
+
     List<Project> findAllByIdIn(List<UUID> ids);
+
+    @EntityGraph(attributePaths = {"sheets"})
     List<Project> findAllByIsDeletedFalse();
 }

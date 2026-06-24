@@ -4,6 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "projects")
 @Data
@@ -25,8 +28,11 @@ public class Project extends BaseEntity {
     @EqualsAndHashCode.Exclude
     User user;
 
-    @Column(name = "project_data", columnDefinition = "TEXT")
-    String projectData;
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Sheet> sheets = new ArrayList<>();
 
     @Column(name = "is_deleted")
     @Builder.Default
