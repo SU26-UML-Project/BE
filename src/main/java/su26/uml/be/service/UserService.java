@@ -26,4 +26,7 @@ public interface UserService {
     ApiResponse<String> resetPassword(ResetPasswordRequest request);
     ApiResponse<String> initChangePassword(String email, ChangePasswordInitRequest request);
     ApiResponse<String> confirmChangePassword(String email, ChangePasswordConfirmRequest request);
+
+    ApiResponse<UserResponse> registerAdmin(UserRegisterRequest request);
+    ApiResponse<Void> toggleUserStatus(UUID userId, String currentUserEmail);
 }

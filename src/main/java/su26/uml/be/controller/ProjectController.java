@@ -29,14 +29,12 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Tag(name = "Projects", description = "UML Project management APIs")
 public class ProjectController {
+
     ProjectService projectService;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Operation(summary = "Create a new project", description = "Creates a new UML project and a default sheet.")
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            content = @Content(schema = @Schema(implementation = ProjectRequest.class),
-                    examples = @ExampleObject(value = SwaggerExamples.PROJECT_REQUEST)))
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200", description = "Project created.",
             content = @Content(schema = @Schema(implementation = ApiResponse.class),
@@ -83,9 +81,6 @@ public class ProjectController {
     @PatchMapping("/{projectId}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Operation(summary = "Update project", description = "Updates project name and description.")
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            content = @Content(schema = @Schema(implementation = ProjectRequest.class),
-                    examples = @ExampleObject(value = SwaggerExamples.PROJECT_REQUEST)))
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200", description = "Project updated.",
             content = @Content(schema = @Schema(implementation = ApiResponse.class),
@@ -100,9 +95,6 @@ public class ProjectController {
     @DeleteMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Operation(summary = "Delete projects", description = "Soft-deletes one or multiple projects and saves version snapshots.")
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            content = @Content(schema = @Schema(implementation = DeleteProjectRequest.class),
-                    examples = @ExampleObject(value = SwaggerExamples.DELETE_PROJECT_REQUEST)))
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200", description = "Projects deleted.",
             content = @Content(schema = @Schema(implementation = ApiResponse.class),
