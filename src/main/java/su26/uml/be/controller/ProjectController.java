@@ -54,8 +54,10 @@ public class ProjectController {
             responseCode = "200", description = "Project list returned.",
             content = @Content(schema = @Schema(implementation = ApiResponse.class),
                     examples = @ExampleObject(value = SwaggerExamples.PROJECT_LIST_RESPONSE)))
-    public ApiResponse<List<ProjectResponse>> getAllProjects(@AuthenticationPrincipal UserDetails userDetails) {
-        return projectService.getAllUserProjects(userDetails.getUsername());
+    public ApiResponse<List<ProjectResponse>> getAllProjects(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(required = false) Boolean isDraft) {
+        return projectService.getAllUserProjects(userDetails.getUsername(), isDraft);
     }
 
     @GetMapping("/admin/all")

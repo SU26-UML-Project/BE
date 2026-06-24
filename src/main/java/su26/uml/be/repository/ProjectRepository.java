@@ -14,8 +14,20 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     @EntityGraph(attributePaths = {"sheets"})
     List<Project> findAllByUserAndIsDeletedFalse(User user);
 
+    @EntityGraph(attributePaths = {"sheets"})
+    List<Project> findAllByUserAndIsDeletedFalseAndIsDraftFalse(User user);
+
+    @EntityGraph(attributePaths = {"sheets"})
+    List<Project> findAllByUserAndIsDeletedFalseAndIsDraftTrue(User user);
+
     List<Project> findAllByIdIn(List<UUID> ids);
 
     @EntityGraph(attributePaths = {"sheets"})
     List<Project> findAllByIsDeletedFalse();
+
+    @EntityGraph(attributePaths = {"sheets"})
+    List<Project> findAllByIsDeletedFalseAndIsDraftFalse();
+
+    @EntityGraph(attributePaths = {"sheets"})
+    List<Project> findAllByIsDeletedFalseAndIsDraftTrue();
 }

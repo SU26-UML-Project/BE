@@ -34,6 +34,9 @@ public class ProjectResponse {
     @Schema(description = "List of sheets (tabs) in the project.")
     List<SheetResponse> sheets;
 
+    @Schema(description = "Whether this project is a draft.")
+    Boolean isDraft;
+
     @Schema(description = "Creation timestamp.")
     LocalDateTime createdAt;
 

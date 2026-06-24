@@ -50,6 +50,9 @@ public class ProjectServiceImpl implements ProjectService {
 
         Project project = projectMapper.toProject(request);
         project.setUser(user);
+        if (request.getIsDraft() != null) {
+            project.setDraft(request.getIsDraft());
+        }
         
         Project savedProject = projectRepository.save(project);
 
@@ -110,18 +113,25 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    public ApiResponse<List<ProjectResponse>> getAllUserProjects(String email) {
+    public ApiResponse<List<ProjectResponse>> getAllUserProjects(String email, Boolean isDraft) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
-        List<Project> projects = projectRepository.findAllByUserAndIsDeletedFalse(user);
+        List<Project> projects;
+        if (isDraft == null) {
+            projects = projectRepository.findAllByUserAndIsDeletedFalse(user);
+        } else if (isDraft) {
+            projects = projectRepository.findAllByUserAndIsDeletedFalseAndIsDraftTrue(user);
+        } else {
+            projects = projectRepository.findAllByUserAndIsDeletedFalseAndIsDraftFalse(user);
+        }
         return ApiResponse.success("Lấy danh sách dự án thành công", projectMapper.toProjectResponseList(projects));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<List<ProjectResponse>> getAllProjectsForAdmin() {
-        List<Project> projects = projectRepository.findAllByIsDeletedFalse();
+        List<Project> projects = projectRepository.findAllByIsDeletedFalseAndIsDraftFalse();
         return ApiResponse.success("Lấy danh sách tất cả dự án thành công (Admin)", projectMapper.toProjectResponseList(projects));
     }
 
