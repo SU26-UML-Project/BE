@@ -18,5 +18,5 @@ public class ProjectRequest {
     @Size(max = 1000, message = "DESCRIPTION_TOO_LONG")
     String description;
 
-    String projectData;
+    Boolean isDraft;
 }

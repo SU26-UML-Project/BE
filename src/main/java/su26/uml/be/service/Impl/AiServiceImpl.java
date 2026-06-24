@@ -1,6 +1,7 @@
 package su26.uml.be.service.Impl;
 
 import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -13,24 +14,19 @@ import su26.uml.be.dto.request.AiWorkspaceUpdateRequest;
 import su26.uml.be.dto.response.*;
 import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
-import su26.uml.be.service.AiAdminService;
+import su26.uml.be.service.AiService;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@FieldDefaults(level = AccessLevel.PRIVATE)
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
-public class AiAdminServiceImpl implements AiAdminService {
+public class AiServiceImpl implements AiService {
 
-    final AnythingLlmClient anythingLlmClient;
-    final AnythingLlmProperties properties;
-
-    public AiAdminServiceImpl(AnythingLlmClient anythingLlmClient,
-                               AnythingLlmProperties properties) {
-        this.anythingLlmClient = anythingLlmClient;
-        this.properties = properties;
-    }
+    AnythingLlmClient anythingLlmClient;
+    AnythingLlmProperties properties;
 
     @Override
     public ApiResponse<AiSystemConfigResponse> getSystemConfig() {

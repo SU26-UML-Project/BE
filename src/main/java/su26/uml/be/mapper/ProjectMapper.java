@@ -7,7 +7,7 @@ import su26.uml.be.entity.Project;
 
 import java.util.List;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = {SheetMapper.class})
 public interface ProjectMapper {
     Project toProject(ProjectRequest request);
 

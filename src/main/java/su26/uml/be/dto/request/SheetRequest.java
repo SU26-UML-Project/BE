@@ -4,17 +4,19 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.util.UUID;
+
 @Data
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class DiagramChatRequest {
+public class SheetRequest {
+    String name;
 
-        String sessionId;
+    Integer orderIndex;
 
-        String sheetId;
+    String diagramData;
 
-        @NotBlank(message = "CHAT_MESSAGE_REQUIRED")
-        String message;
+    UUID projectId;
 }

@@ -5,7 +5,7 @@ import su26.uml.be.entity.AiChatMessageDocument;
 
 import java.util.List;
 
-public interface AiChatMessageMongoRepository
+public interface AiChatMessageRepository
         extends MongoRepository<AiChatMessageDocument, String> {
 
     List<AiChatMessageDocument> findByChatSessionIdOrderByCreatedAtAsc(String chatSessionId);

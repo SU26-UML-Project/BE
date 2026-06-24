@@ -1,4 +1,4 @@
-package su26.uml.be.config;
+package su26.uml.be.config.scheduler;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

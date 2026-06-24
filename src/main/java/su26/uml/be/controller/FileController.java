@@ -22,10 +22,7 @@ import su26.uml.be.config.swagger.SwaggerExamples;
 import su26.uml.be.dto.response.ApiResponse;
 import su26.uml.be.dto.response.FileUploadResponse;
 import su26.uml.be.dto.response.SignedUrlResponse;
-import su26.uml.be.exception.AppException;
-import su26.uml.be.exception.ErrorCode;
-import su26.uml.be.repository.UserRepository;
-import su26.uml.be.service.SupabaseStorageService;
+import su26.uml.be.service.StorageService;
 
 @RestController
 @RequestMapping("/files")
@@ -34,11 +31,7 @@ import su26.uml.be.service.SupabaseStorageService;
 @Tag(name = "Files", description = "Upload avatars/PDFs to Supabase Storage and generate signed URLs.")
 public class FileController {
 
-    SupabaseStorageService supabaseStorageService;
-    UserRepository userRepository;
-
-    static final String AVATARS_BUCKET = "avatars";
-    static final String DOCUMENTS_BUCKET = "documents";
+    StorageService storageService;
 
     @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
@@ -54,15 +47,8 @@ public class FileController {
             @AuthenticationPrincipal UserDetails userDetails,
             @Parameter(description = "Image file (jpg/png/webp, ≤ 2 MB)") @RequestParam("file") MultipartFile file) {
 
-        String userId = currentUserId(userDetails);
-        String url = supabaseStorageService.uploadAvatar(file, userId);
-
         return ApiResponse.success("Tải ảnh đại diện thành công",
-                FileUploadResponse.builder()
-                        .bucket(AVATARS_BUCKET)
-                        .path(pathFromPublicUrl(url))
-                        .url(url)
-                        .build());
+                storageService.uploadAvatar(file, userDetails.getUsername()));
     }
 
     @PostMapping(value = "/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -80,14 +66,8 @@ public class FileController {
             @AuthenticationPrincipal UserDetails userDetails,
             @Parameter(description = "PDF file (≤ 10 MB)") @RequestParam("file") MultipartFile file) {
 
-        String userId = currentUserId(userDetails);
-        String path = supabaseStorageService.uploadDocument(file, userId);
-
         return ApiResponse.success("Tải tài liệu thành công",
-                FileUploadResponse.builder()
-                        .bucket(DOCUMENTS_BUCKET)
-                        .path(path)
-                        .build());
+                storageService.uploadDocument(file, userDetails.getUsername()));
     }
 
     @GetMapping("/documents/signed-url")
@@ -106,27 +86,7 @@ public class FileController {
             @Parameter(description = "URL lifetime in seconds (default 3600).")
             @RequestParam(value = "expiresIn", defaultValue = "3600") int expiresIn) {
 
-        String signedUrl = supabaseStorageService.getSignedUrl(path, expiresIn);
-
         return ApiResponse.success("Tạo đường dẫn truy cập thành công",
-                SignedUrlResponse.builder()
-                        .signedUrl(signedUrl)
-                        .expiresInSeconds(expiresIn)
-                        .build());
-    }
-
-
-    private String currentUserId(UserDetails userDetails) {
-        return userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED))
-                .getId()
-                .toString();
-    }
-
-    /** Extract the bucket-relative path from a public URL for echoing back in the response. */
-    private String pathFromPublicUrl(String publicUrl) {
-        String marker = "/object/public/" + AVATARS_BUCKET + "/";
-        int idx = publicUrl.indexOf(marker);
-        return idx >= 0 ? publicUrl.substring(idx + marker.length()) : publicUrl;
+                storageService.getSignedUrl(path, expiresIn));
     }
 }
