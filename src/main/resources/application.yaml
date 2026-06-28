@@ -140,6 +140,7 @@ anything-llm:
   model-name: ${ANYTHING_LLM_MODEL_NAME:gemma4}
 
 payos:
+  client-id: ${PAYOS_CLIENT_ID:YOUR_CLIENT_ID}
   api-key: ${PAYOS_API_KEY:YOUR_API_KEY}
   checksum-key: ${PAYOS_CHECKSUM_KEY:YOUR_CHECKSUM_KEY}
 
