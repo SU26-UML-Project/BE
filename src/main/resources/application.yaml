@@ -11,7 +11,6 @@ spring:
     import: optional:file:BE/.env[.properties]
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require&prepareThreshold=0
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -139,6 +138,10 @@ anything-llm:
   api-key: ${ANYTHING_LLM_API_KEY}
   workspace-slug: ${ANYTHING_LLM_WORKSPACE_SLUG:uml-diagram}
   model-name: ${ANYTHING_LLM_MODEL_NAME:gemma4}
+
+payos:
+  api-key: ${PAYOS_API_KEY:YOUR_API_KEY}
+  checksum-key: ${PAYOS_CHECKSUM_KEY:YOUR_CHECKSUM_KEY}
 
 management:
   endpoints:

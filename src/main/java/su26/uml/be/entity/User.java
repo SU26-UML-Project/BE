@@ -68,4 +68,9 @@ public class User extends BaseEntity {
     @Column(name = "profile_completed")
     Boolean profileCompleted;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "current_subscription_id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    Subscription currentSubscription;
 }
