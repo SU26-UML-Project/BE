@@ -52,6 +52,15 @@ public class UserResponse {
     @Schema(description = "Timestamp of the last password change.", example = "2026-06-08T09:30:00")
     LocalDateTime lastPasswordChangeAt;
 
+    @Schema(description = "Timestamp of the last activity.", example = "2026-06-29T10:00:00")
+    LocalDateTime lastActiveAt;
+
+    @Schema(description = "Number of non-deleted projects owned by the user.", example = "5")
+    Long projectCount;
+
+    @Schema(description = "Number of diagram sheets across all projects.", example = "42")
+    Long diagramCount;
+
     @Schema(description = "Role assigned to the user.")
     RoleResponse role;
 

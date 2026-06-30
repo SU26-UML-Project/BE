@@ -31,6 +31,15 @@ public class ProjectResponse {
     @Schema(description = "Owner ID.")
     UUID userId;
 
+    @Schema(description = "Owner display name.")
+    String ownerName;
+
+    @Schema(description = "Owner email address.")
+    String ownerEmail;
+
+    @Schema(description = "Number of sheets (diagram tabs) in the project.")
+    Integer diagramCount;
+
     @Schema(description = "List of sheets (tabs) in the project.")
     List<SheetResponse> sheets;
 
