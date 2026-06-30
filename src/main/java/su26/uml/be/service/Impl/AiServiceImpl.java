@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import su26.uml.be.config.anythingllm.AnythingLlmClient;
 import su26.uml.be.config.anythingllm.AnythingLlmProperties;
+import su26.uml.be.dto.request.AiCreateWorkspaceRequest;
 import su26.uml.be.dto.request.AiDocumentDeleteRequest;
 import su26.uml.be.dto.request.AiSystemConfigRequest;
 import su26.uml.be.dto.request.AiWorkspaceUpdateRequest;
@@ -36,6 +37,30 @@ public class AiServiceImpl implements AiService {
         } catch (Exception e) {
             log.error("Failed to fetch system config from AnythingLLM", e);
             throw new AppException(ErrorCode.AI_SYSTEM_CONFIG_FAILED);
+        }
+    }
+
+    @Override
+    public ApiResponse<Void> createWorkspace(AiCreateWorkspaceRequest request) {
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("name", request.getName());
+            anythingLlmClient.createWorkspace(body);
+            return ApiResponse.success("Tạo workspace thành công");
+        } catch (Exception e) {
+            log.error("Failed to create workspace", e);
+            throw new AppException(ErrorCode.AI_WORKSPACE_CREATE_FAILED);
+        }
+    }
+
+    @Override
+    public ApiResponse<Void> deleteWorkspace(String slug) {
+        try {
+            anythingLlmClient.deleteWorkspace(slug);
+            return ApiResponse.success("Xoá workspace thành công");
+        } catch (Exception e) {
+            log.error("Failed to delete workspace", e);
+            throw new AppException(ErrorCode.AI_WORKSPACE_DELETE_FAILED);
         }
     }
 
@@ -243,9 +268,10 @@ public class AiServiceImpl implements AiService {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public ApiResponse<List<String>> getProviderModels(String provider, String basePath) {
         try {
+            String p = provider != null ? provider.toLowerCase() : "";
+
             if (basePath == null || basePath.isBlank()) {
                 try {
                     Map<String, Object> config = anythingLlmClient.getSystemConfig();
@@ -259,20 +285,89 @@ public class AiServiceImpl implements AiService {
                 }
             }
 
-            Map<String, Object> result = anythingLlmClient.getCustomModels(provider, null, basePath);
-            List<Map<String, Object>> models = (List<Map<String, Object>>) result.getOrDefault("models", List.of());
-            List<String> modelIds = models.stream()
-                    .map(m -> str(m.get("id")))
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-            return ApiResponse.success("OK", modelIds);
+            List<String> models;
+            if ("ollama".equals(p)) {
+                models = anythingLlmClient.fetchOllamaModels(basePath);
+            } else if (List.of("openai", "azure", "lm studio", "localai").contains(p)) {
+                models = anythingLlmClient.fetchOpenAiCompatibleModels(basePath);
+            } else {
+                models = KNOWN_PROVIDER_MODELS.getOrDefault(p, List.of());
+            }
+
+            return ApiResponse.success("OK", models);
         } catch (Exception e) {
             log.error("Failed to fetch models for provider {}", provider, e);
             throw new AppException(ErrorCode.AI_PROVIDER_MODELS_FAILED);
         }
     }
 
+    private static final Map<String, List<String>> KNOWN_PROVIDER_MODELS = Map.ofEntries(
+            Map.entry("anthropic", List.of("claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307", "claude-2.1", "claude-2.0")),
+            Map.entry("google", List.of("gemini-pro", "gemini-1.5-pro", "gemini-1.5-flash")),
+            Map.entry("mistral", List.of("mistral-large-latest", "mistral-medium-latest", "mistral-small-latest")),
+            Map.entry("groq", List.of("llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768", "gemma2-9b-it")),
+            Map.entry("together", List.of("mistralai/Mixtral-8x7B-Instruct-v0.1", "meta-llama/Llama-3-70b-chat-hf")),
+            Map.entry("deepseek", List.of("deepseek-chat", "deepseek-coder")),
+            Map.entry("openrouter", List.of("openrouter/auto", "meta-llama/llama-3-70b-instruct")),
+            Map.entry("perplexity", List.of("llama-3-sonar-large-32k", "llama-3-sonar-small-32k")),
+            Map.entry("cohere", List.of("command-r", "command-r-plus")),
+            Map.entry("fireworks", List.of("accounts/fireworks/models/llama-v3-70b-instruct")),
+            Map.entry("novita", List.of("llama3-70b-instruct"))
+    );
+
     // ─── Private helpers ─────────────────────────────────────────
+
+    // ─── Provider env var mapping ──────────────────────────────
+    private static final Map<String, String> LLM_API_KEY_MAP = Map.ofEntries(
+            Map.entry("openai", "OpenAiKey"),
+            Map.entry("anthropic", "AnthropicApiKey"),
+            Map.entry("azure", "AzureOpenAiKey"),
+            Map.entry("google", "GeminiLLMApiKey"),
+            Map.entry("gemini", "GeminiLLMApiKey"),
+            Map.entry("mistral", "MistralApiKey"),
+            Map.entry("groq", "GroqApiKey"),
+            Map.entry("together", "TogetherAiApiKey"),
+            Map.entry("deepseek", "DeepSeekApiKey"),
+            Map.entry("openrouter", "OpenRouterApiKey"),
+            Map.entry("perplexity", "PerplexityApiKey")
+    );
+
+    private static final Map<String, String> LLM_BASE_URL_MAP = Map.of(
+            "ollama", "OllamaLLMBasePath",
+            "openai", "OpenAiBasePath",
+            "azure", "AzureOpenAiBasePath",
+            "anthropic", "AnthropicBasePath"
+    );
+
+    private static final Map<String, String> LLM_MODEL_MAP = Map.of(
+            "ollama", "OllamaLLMModelPref",
+            "openai", "OpenAiModelPref",
+            "anthropic", "AnthropicModelPref",
+            "google", "GeminiLLMModelPref",
+            "gemini", "GeminiLLMModelPref",
+            "azure", "AzureOpenAiModelPref"
+    );
+
+    private static final Map<String, String> EMB_MODEL_MAP = Map.of(
+            "openai", "OpenAiEmbeddingModelPref",
+            "ollama", "OllamaEmbeddingModelPref",
+            "azure", "AzureOpenAiEmbeddingModelPref"
+    );
+
+    private static final Map<String, String> VDB_ENDPOINT_MAP = Map.of(
+            "qdrant", "QdrantEndpoint",
+            "pinecone", "PineConeEndpoint",
+            "chroma", "ChromaEndpoint",
+            "weaviate", "WeaviateEndpoint",
+            "milvus", "MilvusAddress"
+    );
+
+    private static final Map<String, String> VDB_API_KEY_MAP = Map.of(
+            "qdrant", "QdrantApiKey",
+            "chroma", "ChromaApiKey",
+            "weaviate", "WeaviateApiKey",
+            "pinecone", "PineConeKey"
+    );
 
     private Map<String, Object> buildSystemEnvConfig(AiSystemConfigRequest request) {
         Map<String, Object> env = new HashMap<>();
@@ -283,29 +378,25 @@ public class AiServiceImpl implements AiService {
         }
 
         if (request.getBaseUrl() != null) {
-            if ("ollama".equals(provider)) {
-                env.put("OllamaLLMBasePath", request.getBaseUrl());
-            }
+            env.put(LLM_BASE_URL_MAP.getOrDefault(provider, "OpenAiBasePath"), request.getBaseUrl());
         }
 
         if (request.getApiKey() != null) {
-            switch (provider) {
-                case "openai" -> env.put("OpenAiKey", request.getApiKey());
-                case "anthropic" -> env.put("AnthropicApiKey", request.getApiKey());
-                case "azure" -> env.put("AzureOpenAiKey", request.getApiKey());
-                case "google", "gemini" -> env.put("GeminiLLMApiKey", request.getApiKey());
-            }
+            String key = LLM_API_KEY_MAP.get(provider);
+            if (key != null) env.put(key, request.getApiKey());
         }
 
         if (request.getModel() != null) {
-            switch (provider) {
-                case "ollama" -> env.put("OllamaLLMModelPref", request.getModel());
-                case "openai" -> env.put("OpenAiModelPref", request.getModel());
-                case "anthropic" -> env.put("AnthropicModelPref", request.getModel());
-                case "google", "gemini" -> env.put("GeminiLLMModelPref", request.getModel());
-                case "azure" -> env.put("AzureOpenAiModelPref", request.getModel());
-                default -> env.put("OpenAiModelPref", request.getModel());
-            }
+            env.put(LLM_MODEL_MAP.getOrDefault(provider, "OpenAiModelPref"), request.getModel());
+        }
+
+        if (request.getEmbeddingProvider() != null) {
+            env.put("EmbeddingEngine", request.getEmbeddingProvider());
+        }
+
+        if (request.getEmbeddingModel() != null) {
+            String embProvider = request.getEmbeddingProvider() != null ? request.getEmbeddingProvider().toLowerCase() : "";
+            env.put(EMB_MODEL_MAP.getOrDefault(embProvider, "EmbeddingModelPref"), request.getEmbeddingModel());
         }
 
         if (request.getVectorDb() != null) {
@@ -314,25 +405,20 @@ public class AiServiceImpl implements AiService {
 
         if (request.getVectorDbEndpoint() != null) {
             String vdb = request.getVectorDb() != null ? request.getVectorDb().toLowerCase() : "";
-            switch (vdb) {
-                case "qdrant" -> env.put("QdrantEndpoint", request.getVectorDbEndpoint());
-                case "pinecone" -> env.put("PineConeEndpoint", request.getVectorDbEndpoint());
-                case "chroma" -> env.put("ChromaEndpoint", request.getVectorDbEndpoint());
-                case "weaviate" -> env.put("WeaviateEndpoint", request.getVectorDbEndpoint());
-                case "milvus" -> env.put("MilvusAddress", request.getVectorDbEndpoint());
-                default -> env.put("QdrantEndpoint", request.getVectorDbEndpoint());
-            }
+            env.put(VDB_ENDPOINT_MAP.getOrDefault(vdb, "QdrantEndpoint"), request.getVectorDbEndpoint());
         }
 
         if (request.getVectorDbApiKey() != null) {
             String vdb = request.getVectorDb() != null ? request.getVectorDb().toLowerCase() : "";
-            switch (vdb) {
-                case "qdrant" -> env.put("QdrantApiKey", request.getVectorDbApiKey());
-                case "chroma" -> env.put("ChromaApiKey", request.getVectorDbApiKey());
-                case "weaviate" -> env.put("WeaviateApiKey", request.getVectorDbApiKey());
-                case "pinecone" -> env.put("PineConeKey", request.getVectorDbApiKey());
-                default -> env.put("QdrantApiKey", request.getVectorDbApiKey());
-            }
+            String key = VDB_API_KEY_MAP.get(vdb);
+            if (key != null) env.put(key, request.getVectorDbApiKey());
+        }
+
+        if (request.getDocumentChunkSize() != null) {
+            env.put("DocumentChunkSize", request.getDocumentChunkSize());
+        }
+        if (request.getDocumentChunkOverlap() != null) {
+            env.put("DocumentChunkOverlap", request.getDocumentChunkOverlap());
         }
 
         return env;
@@ -347,11 +433,37 @@ public class AiServiceImpl implements AiService {
         String vectorDb = str(settings.get("VectorDB"));
         String vectorDbEndpoint = resolveVectorDbEndpoint(vectorDb, settings);
 
+        // Read embedding model from provider-specific key, fallback to generic key
+        String embProvider = str(settings.get("EmbeddingEngine"));
+        String embModelPrefKey = EMB_MODEL_MAP.getOrDefault(
+                embProvider != null ? embProvider.toLowerCase() : "",
+                "EmbeddingModelPref"
+        );
+        String embeddingModel = str(settings.get(embModelPrefKey));
+        if (embeddingModel == null) embeddingModel = str(settings.get("EmbeddingModelPref"));
+
+        String llmProvider = str(settings.get("LLMProvider"));
+        String model = str(settings.get("LLMModel"));
+        if (model == null && llmProvider != null) {
+            String modelKey = LLM_MODEL_MAP.get(llmProvider.toLowerCase());
+            if (modelKey != null) model = str(settings.get(modelKey));
+        }
+
+        Integer chunkSize = null;
+        try { Object o = settings.get("DocumentChunkSize"); if (o instanceof Number) chunkSize = ((Number) o).intValue(); } catch (Exception ignored) {}
+        Integer chunkOverlap = null;
+        try { Object o = settings.get("DocumentChunkOverlap"); if (o instanceof Number) chunkOverlap = ((Number) o).intValue(); } catch (Exception ignored) {}
+
         return AiSystemConfigResponse.builder()
-                .llmProvider(str(settings.get("LLMProvider")))
-                .model(str(settings.get("LLMModel")))
+                .llmProvider(llmProvider)
+                .model(model)
+                .embeddingProvider(embProvider)
+                .embeddingModel(embeddingModel)
                 .vectorDb(vectorDb)
                 .vectorDbEndpoint(vectorDbEndpoint)
+                .anythingLlmBaseUrl(properties.baseUrl())
+                .documentChunkSize(chunkSize)
+                .documentChunkOverlap(chunkOverlap)
                 .hasApiKey(hasApiKeyConfigured(settings))
                 .build();
     }
@@ -372,19 +484,9 @@ public class AiServiceImpl implements AiService {
     private boolean hasApiKeyConfigured(Map<String, Object> settings) {
         String provider = str(settings.get("LLMProvider"));
         if (provider == null) return false;
-        return switch (provider.toLowerCase()) {
-            case "openai" -> isTruthy(settings.get("OpenAiKey"));
-            case "anthropic" -> isTruthy(settings.get("AnthropicApiKey"));
-            case "google", "gemini" -> isTruthy(settings.get("GeminiLLMApiKey"));
-            case "azure" -> isTruthy(settings.get("AzureOpenAiKey"));
-            case "mistral" -> isTruthy(settings.get("MistralApiKey"));
-            case "groq" -> isTruthy(settings.get("GroqApiKey"));
-            case "together" -> isTruthy(settings.get("TogetherAiApiKey"));
-            case "deepseek" -> isTruthy(settings.get("DeepSeekApiKey"));
-            case "openrouter" -> isTruthy(settings.get("OpenRouterApiKey"));
-            case "perplexity" -> isTruthy(settings.get("PerplexityApiKey"));
-            default -> true;
-        };
+        String envKey = LLM_API_KEY_MAP.get(provider.toLowerCase());
+        if (envKey != null) return isTruthy(settings.get(envKey));
+        return true; // providers without API key (e.g., Ollama) are always "configured"
     }
 
     private boolean isTruthy(Object value) {

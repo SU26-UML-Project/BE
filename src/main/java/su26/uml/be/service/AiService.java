@@ -1,6 +1,7 @@
 package su26.uml.be.service;
 
 import org.springframework.web.multipart.MultipartFile;
+import su26.uml.be.dto.request.AiCreateWorkspaceRequest;
 import su26.uml.be.dto.request.AiDocumentDeleteRequest;
 import su26.uml.be.dto.request.AiSystemConfigRequest;
 import su26.uml.be.dto.request.AiWorkspaceUpdateRequest;
@@ -35,4 +36,8 @@ public interface AiService {
     ApiResponse<Void> reEmbedDocuments(String workspaceSlug);
 
     ApiResponse<AiVersionResponse> getVersion();
+
+    ApiResponse<Void> createWorkspace(AiCreateWorkspaceRequest request);
+
+    ApiResponse<Void> deleteWorkspace(String slug);
 }

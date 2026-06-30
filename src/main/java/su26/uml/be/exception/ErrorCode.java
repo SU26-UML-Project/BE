@@ -72,6 +72,8 @@ public enum ErrorCode {
     AI_CONNECTION_FAILED(1082, "Không thể kết nối đến AnythingLLM", HttpStatus.SERVICE_UNAVAILABLE),
     AI_WORKSPACE_NOT_FOUND(1083, "Không tìm thấy workspace trên AnythingLLM", HttpStatus.NOT_FOUND),
     AI_WORKSPACE_UPDATE_FAILED(1084, "Không thể cập nhật workspace", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_WORKSPACE_CREATE_FAILED(1089, "Không thể tạo workspace", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_WORKSPACE_DELETE_FAILED(1090, "Không thể xoá workspace", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_DOCUMENT_UPLOAD_FAILED(1085, "Tải document lên AnythingLLM thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_DOCUMENT_DELETE_FAILED(1086, "Xoá document thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_RE_EMBED_FAILED(1087, "Re-embed documents thất bại", HttpStatus.INTERNAL_SERVER_ERROR),

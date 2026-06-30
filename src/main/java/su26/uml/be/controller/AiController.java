@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import su26.uml.be.dto.request.AiCreateWorkspaceRequest;
 import su26.uml.be.dto.request.AiDocumentDeleteRequest;
 import su26.uml.be.dto.request.AiSystemConfigRequest;
 import su26.uml.be.dto.request.AiWorkspaceUpdateRequest;
@@ -114,5 +115,18 @@ public class AiController {
     public ApiResponse<Void> reEmbedDocuments(
             @RequestParam(required = false) String workspace) {
         return aiService.reEmbedDocuments(workspace);
+    }
+
+    @PostMapping("/workspace")
+    @Operation(summary = "Create workspace", description = "Create a new workspace in AnythingLLM.")
+    public ApiResponse<Void> createWorkspace(
+            @Valid @RequestBody AiCreateWorkspaceRequest request) {
+        return aiService.createWorkspace(request);
+    }
+
+    @DeleteMapping("/workspace/{slug}")
+    @Operation(summary = "Delete workspace", description = "Delete a workspace by slug from AnythingLLM.")
+    public ApiResponse<Void> deleteWorkspace(@PathVariable String slug) {
+        return aiService.deleteWorkspace(slug);
     }
 }

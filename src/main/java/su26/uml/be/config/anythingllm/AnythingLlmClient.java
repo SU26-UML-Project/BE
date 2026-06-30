@@ -4,6 +4,8 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
@@ -14,10 +16,12 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import su26.uml.be.dto.response.AnythingLlmChatResponse;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class AnythingLlmClient {
 
     private final WebClient anythingLlmWebClient;
@@ -83,21 +87,63 @@ public class AnythingLlmClient {
                 .block(Duration.ofSeconds(15));
     }
 
-    // ─── Custom Models ───────────────────────────────────────────
-    public Map<String, Object> getCustomModels(String provider, String apiKey, String basePath) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("provider", provider);
-        if (apiKey != null) body.put("apiKey", apiKey);
-        if (basePath != null) body.put("basePath", basePath);
+    // ─── Model Auto-Detect ───────────────────────────────────────
+    public List<String> fetchOllamaModels(String baseUrl) {
+        try {
+            String url = baseUrl != null && !baseUrl.isBlank()
+                    ? baseUrl.replaceAll("/+$", "") + "/api/tags"
+                    : "http://localhost:11434/api/tags";
 
-        return anythingLlmWebClient.post()
-                .uri("/system/custom-models")
-                .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
-                .block(Duration.ofSeconds(15));
+            WebClient ollamaClient = WebClient.builder()
+                    .baseUrl(url)
+                    .build();
+
+            Map<String, Object> raw = ollamaClient.get()
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
+                    .block(Duration.ofSeconds(10));
+
+            List<Map<String, Object>> models = (List<Map<String, Object>>) raw.getOrDefault("models", List.of());
+            return models.stream()
+                    .map(m -> str(m.get("name")))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("Failed to fetch Ollama models from {}", baseUrl, e);
+            return List.of();
+        }
+    }
+
+    public List<String> fetchOpenAiCompatibleModels(String baseUrl) {
+        try {
+            String url = baseUrl != null && !baseUrl.isBlank()
+                    ? baseUrl.replaceAll("/+$", "") + "/v1/models"
+                    : "http://localhost:1234/v1/models";
+
+            WebClient openAiClient = WebClient.builder()
+                    .baseUrl(url)
+                    .build();
+
+            Map<String, Object> raw = openAiClient.get()
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
+                    .block(Duration.ofSeconds(10));
+
+            List<Map<String, Object>> models = (List<Map<String, Object>>) raw.getOrDefault("data", List.of());
+            return models.stream()
+                    .map(m -> str(m.get("id")))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("Failed to fetch OpenAI-compatible models from {}", baseUrl, e);
+            return List.of();
+        }
+    }
+
+    private String str(Object value) {
+        return value != null ? value.toString() : null;
     }
 
     // ─── Connection Test ─────────────────────────────────────────
@@ -118,6 +164,26 @@ public class AnythingLlmClient {
     }
 
     // ─── Workspaces ──────────────────────────────────────────────
+    public Map<String, Object> createWorkspace(Map<String, Object> body) {
+        return anythingLlmWebClient.post()
+                .uri("/v1/workspace/new")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
+                .block(Duration.ofSeconds(15));
+    }
+
+    public void deleteWorkspace(String slug) {
+        anythingLlmWebClient.method(org.springframework.http.HttpMethod.DELETE)
+                .uri("/v1/workspace/{slug}", slug)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block(Duration.ofSeconds(10));
+    }
+
     public Map<String, Object> getWorkspaces() {
         return anythingLlmWebClient.get()
                 .uri("/v1/workspaces")
@@ -174,10 +240,10 @@ public class AnythingLlmClient {
 
     public void deleteDocument(String documentPath) {
         Map<String, Object> body = new HashMap<>();
-        body.put("name", documentPath);
+        body.put("names", List.of(documentPath));
 
         anythingLlmWebClient.method(org.springframework.http.HttpMethod.DELETE)
-                .uri("/system/remove-document")
+                .uri("/v1/system/remove-documents")
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .bodyValue(body)
