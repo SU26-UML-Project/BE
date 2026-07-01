@@ -6,6 +6,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import su26.uml.be.annotation.Auditable;
 import su26.uml.be.config.anythingllm.AnythingLlmClient;
 import su26.uml.be.config.anythingllm.AnythingLlmProperties;
 import su26.uml.be.dto.request.AiCreateWorkspaceRequest;
@@ -46,6 +47,7 @@ public class AiServiceImpl implements AiService {
     }
 
     @Override
+    @Auditable(action = "AI_WORKSPACE_CREATE", targetType = "AI_WORKSPACE", targetId = "#request.name")
     public ApiResponse<Void> createWorkspace(AiCreateWorkspaceRequest request) {
         try {
             Map<String, Object> body = new HashMap<>();
@@ -59,6 +61,7 @@ public class AiServiceImpl implements AiService {
     }
 
     @Override
+    @Auditable(action = "AI_WORKSPACE_DELETE", targetType = "AI_WORKSPACE", targetId = "#slug")
     public ApiResponse<Void> deleteWorkspace(String slug) {
         try {
             anythingLlmClient.deleteWorkspace(slug);
@@ -70,6 +73,7 @@ public class AiServiceImpl implements AiService {
     }
 
     @Override
+    @Auditable(action = "AI_CONFIG_UPDATE", targetType = "AI_CONFIG")
     public ApiResponse<AiSystemConfigResponse> updateSystemConfig(AiSystemConfigRequest request) {
         try {
             Map<String, Object> envConfig = buildSystemEnvConfig(request);
@@ -124,6 +128,7 @@ public class AiServiceImpl implements AiService {
 
     @Override
     @SuppressWarnings("unchecked")
+    @Auditable(action = "AI_WORKSPACE_UPDATE", targetType = "AI_WORKSPACE", targetId = "#slug")
     public ApiResponse<AiWorkspaceResponse> updateWorkspace(AiWorkspaceUpdateRequest request, String slug) {
         try {
             String resolved = slug != null && !slug.isBlank() ? slug : properties.workspaceSlug();
@@ -198,6 +203,7 @@ public class AiServiceImpl implements AiService {
     }
 
     @Override
+    @Auditable(action = "AI_DOCUMENT_UPLOAD", targetType = "AI_DOCUMENT", targetId = "#file.originalFilename")
     public ApiResponse<Void> uploadDocument(MultipartFile file, String workspaceSlug) {
         try {
             String slug = workspaceSlug != null && !workspaceSlug.isBlank()
@@ -235,6 +241,7 @@ public class AiServiceImpl implements AiService {
     }
 
     @Override
+    @Auditable(action = "AI_DOCUMENT_DELETE", targetType = "AI_DOCUMENT", targetId = "#request.documentPath")
     public ApiResponse<Void> deleteDocument(AiDocumentDeleteRequest request) {
         try {
             anythingLlmClient.deleteDocument(request.getDocumentPath());
@@ -246,6 +253,7 @@ public class AiServiceImpl implements AiService {
     }
 
     @Override
+    @Auditable(action = "AI_DOCUMENT_REEMBED", targetType = "AI_DOCUMENT", targetId = "#workspaceSlug")
     public ApiResponse<Void> reEmbedDocuments(String workspaceSlug) {
         try {
             String slug = workspaceSlug != null && !workspaceSlug.isBlank()

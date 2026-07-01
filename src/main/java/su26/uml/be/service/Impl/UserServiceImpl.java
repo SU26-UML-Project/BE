@@ -9,6 +9,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import su26.uml.be.annotation.Auditable;
+import su26.uml.be.audit.AuditContext;
 import su26.uml.be.dto.request.*;
 import su26.uml.be.enums.UserStatus;
 import su26.uml.be.dto.response.ApiResponse;
@@ -363,6 +365,7 @@ public class UserServiceImpl implements UserService {
 
 
     @Override
+    @Auditable(action = "ADMIN_CREATE", targetType = "USER")
     public ApiResponse<UserResponse> registerAdmin(UserRegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail()))
             throw new AppException(ErrorCode.EMAIL_EXISTED);
@@ -377,10 +380,16 @@ public class UserServiceImpl implements UserService {
         user.setProfileCompleted(true);
         User savedUser = userRepository.save(user);
 
+        // Audit: id/email của admin vừa tạo (target chỉ có sau khi save).
+        AuditContext.setTargetId(savedUser.getId());
+        AuditContext.putDetail("email", savedUser.getEmail());
+        AuditContext.putDetail("role", "ADMIN");
+
         return ApiResponse.success("Tạo tài khoản Admin thành công", userMapper.toUserResponse(savedUser));
     }
 
     @Override
+    @Auditable(action = "USER_STATUS_TOGGLE", targetType = "USER", targetId = "#userId")
     public ApiResponse<Void> toggleUserStatus(UUID userId, String currentUserEmail) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
@@ -394,15 +403,21 @@ public class UserServiceImpl implements UserService {
         if ("ADMIN".equalsIgnoreCase(user.getRole().getRoleName()))
             throw new AppException(ErrorCode.DELETE_OTHER_ADMIN_INVALID);
 
+        UserStatus before = user.getStatus();
         String message;
         if (user.getStatus() == UserStatus.ACTIVE) {
             user.setStatus(UserStatus.LOCKED);
             message = "Đã khóa tài khoản thành công";
+            // Toggle: chọn action cụ thể để FE lọc đúng (thay cho action tĩnh của annotation).
+            AuditContext.setAction("USER_LOCK");
         } else {
             user.setStatus(UserStatus.ACTIVE);
             message = "Đã mở khóa tài khoản thành công";
+            AuditContext.setAction("USER_UNLOCK");
         }
         userRepository.save(user);
+
+        AuditContext.putBeforeAfter(before, user.getStatus());
 
         return ApiResponse.success(message, null);
     }
