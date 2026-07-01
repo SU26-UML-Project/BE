@@ -17,6 +17,10 @@ import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.service.AiService;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,6 +32,7 @@ public class AiServiceImpl implements AiService {
 
     AnythingLlmClient anythingLlmClient;
     AnythingLlmProperties properties;
+    static final Path DOC_CONTENT_DIR = Paths.get("data", "doc-content");
 
     @Override
     public ApiResponse<AiSystemConfigResponse> getSystemConfig() {
@@ -198,10 +203,34 @@ public class AiServiceImpl implements AiService {
             String slug = workspaceSlug != null && !workspaceSlug.isBlank()
                     ? workspaceSlug : properties.workspaceSlug();
             anythingLlmClient.uploadDocument(file, slug);
+            String content = new String(file.getBytes(), StandardCharsets.UTF_8);
+            Path wsDir = DOC_CONTENT_DIR.resolve(slug);
+            Files.createDirectories(wsDir);
+            Files.writeString(wsDir.resolve(file.getOriginalFilename()), content);
             return ApiResponse.success("Tải document lên thành công");
         } catch (Exception e) {
             log.error("Failed to upload document", e);
             throw new AppException(ErrorCode.AI_DOCUMENT_UPLOAD_FAILED);
+        }
+    }
+
+    @Override
+    public ApiResponse<String> getDocumentContent(String workspace, String filename) {
+        try {
+            Path wsDir = DOC_CONTENT_DIR.resolve(workspace);
+            Path filePath = wsDir.resolve(filename);
+            log.info("getDocumentContent: workspace={}, filename={}, resolvedPath={}", workspace, filename, filePath.toAbsolutePath());
+            if (!Files.exists(filePath)) {
+                log.warn("Document content not found at {}", filePath.toAbsolutePath());
+                throw new AppException(ErrorCode.AI_DOCUMENT_CONTENT_NOT_FOUND);
+            }
+            String content = Files.readString(filePath);
+            return ApiResponse.success("OK", content);
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to read document content for workspace={}, filename={}", workspace, filename, e);
+            throw new AppException(ErrorCode.AI_DOCUMENT_CONTENT_NOT_FOUND);
         }
     }
 
@@ -554,12 +583,17 @@ public class AiServiceImpl implements AiService {
         String docId = str(doc.get("docId"));
         if (docId == null || docId.isBlank()) docId = Optional.ofNullable(doc.get("id")).map(Object::toString).orElse(null);
 
+        String rawFilename = str(doc.get("filename"));
+        if (rawFilename != null) {
+            rawFilename = rawFilename.replaceAll("-[a-f0-9-]{36}\\.json$", "");
+        }
+
         return AiDocumentResponse.builder()
                 .docId(docId)
-                .filename(str(doc.get("filename")))
+                .filename(rawFilename)
                 .docpath(str(doc.get("docpath")))
                 .size(doc.get("size") instanceof Number ? ((Number) doc.get("size")).longValue() : null)
-                .status("embedded")
+                .status(str(doc.get("status")))
                 .uploadedAt(str(doc.get("createdAt")))
                 .build();
     }

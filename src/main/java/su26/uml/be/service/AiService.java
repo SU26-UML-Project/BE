@@ -31,6 +31,8 @@ public interface AiService {
 
     ApiResponse<Void> uploadDocument(MultipartFile file, String workspaceSlug);
 
+    ApiResponse<String> getDocumentContent(String workspace, String filename);
+
     ApiResponse<Void> deleteDocument(AiDocumentDeleteRequest request);
 
     ApiResponse<Void> reEmbedDocuments(String workspaceSlug);

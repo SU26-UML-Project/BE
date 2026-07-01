@@ -98,6 +98,14 @@ public class AiController {
         return aiService.uploadDocument(file, workspace);
     }
 
+    @GetMapping("/documents/content")
+    @Operation(summary = "Get document content", description = "Get the raw text content of a document by workspace and filename.")
+    public ApiResponse<String> getDocumentContent(
+            @RequestParam String workspace,
+            @RequestParam String filename) {
+        return aiService.getDocumentContent(workspace, filename);
+    }
+
     @DeleteMapping("/documents")
     @Operation(summary = "Delete document", description = "Delete a document from the system by its document name.")
     public ApiResponse<Void> deleteDocument(@Valid @RequestBody AiDocumentDeleteRequest request) {

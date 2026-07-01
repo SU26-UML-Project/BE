@@ -78,6 +78,7 @@ public enum ErrorCode {
     AI_DOCUMENT_DELETE_FAILED(1086, "Xoá document thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_RE_EMBED_FAILED(1087, "Re-embed documents thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_PROVIDER_MODELS_FAILED(1088, "Không thể lấy danh sách model từ provider", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_DOCUMENT_CONTENT_NOT_FOUND(1091, "Không tìm thấy nội dung document", HttpStatus.NOT_FOUND),
 
     PASSWORD_INCORRECT(1070, "Mật khẩu hiện tại không chính xác", HttpStatus.BAD_REQUEST),
     PASSWORD_CHANGE_LIMIT(1071, "Bạn chỉ được phép đổi mật khẩu 1 lần trong vòng 7 ngày", HttpStatus.BAD_REQUEST),
