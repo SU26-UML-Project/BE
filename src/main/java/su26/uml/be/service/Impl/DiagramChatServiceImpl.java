@@ -417,12 +417,8 @@ public class DiagramChatServiceImpl implements DiagramChatService {
                             q.setType("text");
                         }
                     } else {
-                        // Nếu đã có options từ AI, chỉ cần đảm bảo có nút "Khác"
-                        List<String> options = new ArrayList<>(q.getOptions());
-                        if (!options.contains("Khác")) {
-                            options.add("Khác");
-                        }
-                        q.setOptions(options);
+                        // Giữ nguyên options từ AI
+                        q.setOptions(q.getOptions());
                     }
                 }
             } else {
@@ -491,9 +487,6 @@ public class DiagramChatServiceImpl implements DiagramChatService {
             options.addAll(List.of("Có, chắc chắn rồi", "Không, bỏ qua đi", "Để tôi suy nghĩ thêm"));
         }
 
-        if (!options.isEmpty() && !options.contains("Khác")) {
-            options.add("Khác");
-        }
         return options;
     }
 
