@@ -11,6 +11,7 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ProjectRequest {
+    @NotBlank(message = "PROJECT_NAME_REQUIRED")
     @Size(max = 255, message = "PROJECT_NAME_TOO_LONG")
     String projectName;
 
