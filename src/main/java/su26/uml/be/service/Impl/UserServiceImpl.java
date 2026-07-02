@@ -23,7 +23,9 @@ import su26.uml.be.entity.User;
 import su26.uml.be.exception.AppException;
 import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.mapper.UserMapper;
+import su26.uml.be.repository.ProjectRepository;
 import su26.uml.be.repository.RoleRepository;
+import su26.uml.be.repository.SheetRepository;
 import su26.uml.be.repository.UserRepository;
 import su26.uml.be.service.EmailService;
 import su26.uml.be.service.OtpService;
@@ -33,6 +35,7 @@ import su26.uml.be.service.UserService;
 
 import java.security.SecureRandom;
 import java.util.UUID;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +45,8 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
     UserRepository userRepository;
     RoleRepository roleRepository;
+    ProjectRepository projectRepository;
+    SheetRepository sheetRepository;
 
     EmailService emailService;
     OtpService otpService;
@@ -185,8 +190,26 @@ public class UserServiceImpl implements UserService {
             throw new AppException(ErrorCode.USER_LIST_EMPTY);
         }
 
+        List<User> users = page.getContent();
+        List<UserResponse> responses = userMapper.toUserResponseList(users);
+
+        for (int i = 0; i < users.size(); i++) {
+            User user = users.get(i);
+            UserResponse resp = responses.get(i);
+
+            resp.setLastActiveAt(user.getLastActiveAt());
+
+            long projectCount = projectRepository.countByUserAndIsDeletedFalse(user);
+            resp.setProjectCount(projectCount);
+
+            long diagramCount = projectCount > 0
+                    ? sheetRepository.countByProject_UserAndProject_IsDeletedFalse(user)
+                    : 0L;
+            resp.setDiagramCount(diagramCount);
+        }
+
         PagedResponse<UserResponse> pagedResponse = PagedResponse.<UserResponse>builder()
-                .content(userMapper.toUserResponseList(page.getContent()))
+                .content(responses)
                 .page(page.getNumber())
                 .size(page.getSize())
                 .totalElements(page.getTotalElements())

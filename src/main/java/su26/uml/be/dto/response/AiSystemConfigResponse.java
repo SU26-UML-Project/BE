@@ -11,7 +11,12 @@ import lombok.experimental.FieldDefaults;
 public class AiSystemConfigResponse {
     String llmProvider;
     String model;
+    String embeddingProvider;
+    String embeddingModel;
     String vectorDb;
     String vectorDbEndpoint;
+    String anythingLlmBaseUrl;
+    Integer documentChunkSize;
+    Integer documentChunkOverlap;
     Boolean hasApiKey;
 }

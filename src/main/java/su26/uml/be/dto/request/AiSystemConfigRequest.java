@@ -13,7 +13,11 @@ public class AiSystemConfigRequest {
     String baseUrl;
     String apiKey;
     String model;
+    String embeddingProvider;
+    String embeddingModel;
     String vectorDb;
     String vectorDbEndpoint;
     String vectorDbApiKey;
+    Integer documentChunkSize;
+    Integer documentChunkOverlap;
 }

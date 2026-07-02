@@ -12,6 +12,9 @@ public interface ProjectMapper {
     Project toProject(ProjectRequest request);
 
     @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "ownerName", source = "user.fullName")
+    @Mapping(target = "ownerEmail", source = "user.email")
+    @Mapping(target = "diagramCount", expression = "java(project.getSheets() != null ? project.getSheets().size() : 0)")
     ProjectResponse toProjectResponse(Project project);
 
     List<ProjectResponse> toProjectResponseList(List<Project> projects);
