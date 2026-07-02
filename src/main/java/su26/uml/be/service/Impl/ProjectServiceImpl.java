@@ -45,6 +45,10 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     public ApiResponse<ProjectResponse> createProject(String email, ProjectRequest request) {
+        if (request.getProjectName() == null || request.getProjectName().isBlank()) {
+            throw new AppException(ErrorCode.PROJECT_NAME_REQUIRED);
+        }
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
@@ -52,6 +56,9 @@ public class ProjectServiceImpl implements ProjectService {
         project.setUser(user);
         if (request.getIsDraft() != null) {
             project.setDraft(request.getIsDraft());
+        }
+        if (request.getPublicAccess() != null) {
+            project.setPublicAccess(request.getPublicAccess());
         }
         
         Project savedProject = projectRepository.save(project);
@@ -78,6 +85,9 @@ public class ProjectServiceImpl implements ProjectService {
         projectMapper.updateProject(request, project);
         if (request.getIsDraft() != null) {
             project.setDraft(request.getIsDraft());
+        }
+        if (request.getPublicAccess() != null) {
+            project.setPublicAccess(request.getPublicAccess());
         }
         Project updatedProject = projectRepository.save(project);
 
@@ -151,7 +161,8 @@ public class ProjectServiceImpl implements ProjectService {
 
         boolean isAdmin = user.getRole().getRoleName().equals("ADMIN");
 
-        if (!isAdmin && !project.getUser().getEmail().equals(email)) {
+        // Allow access if user is owner OR user is admin OR project is public
+        if (!isAdmin && !project.getUser().getEmail().equals(email) && !Boolean.TRUE.equals(project.getPublicAccess())) {
             throw new AppException(ErrorCode.PROJECT_ACCESS_DENIED);
         }
         return project;

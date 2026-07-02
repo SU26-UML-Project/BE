@@ -41,4 +41,8 @@ public class Project extends BaseEntity {
     @Column(name = "is_draft")
     @Builder.Default
     boolean isDraft = false;
+
+    @Column(name = "public_access")
+    @Builder.Default
+    Boolean publicAccess = false;
 }
