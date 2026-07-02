@@ -13,6 +13,8 @@ import su26.uml.be.entity.Subscription;
 import su26.uml.be.entity.User;
 import su26.uml.be.enums.PaymentStatus;
 import su26.uml.be.enums.SubscriptionStatus;
+import su26.uml.be.exception.AppException;
+import su26.uml.be.exception.ErrorCode;
 import su26.uml.be.repository.PaymentTransactionRepository;
 import su26.uml.be.repository.PlanRepository;
 import su26.uml.be.repository.SubscriptionRepository;
@@ -23,6 +25,7 @@ import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
 import vn.payos.model.webhooks.WebhookData;
 
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -40,11 +43,23 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${app.frontend.base-url:http://localhost:5173}")
     private String frontendUrl;
 
+    /**
+     * Loại bỏ dấu tiếng Việt và ký tự đặc biệt để tuân thủ yêu cầu ASCII của PayOS.
+     * PayOS không chấp nhận description có ký tự ngoài ASCII.
+     */
+    private String toAsciiSafe(String input) {
+        if (input == null) return "";
+        // Decompose Unicode characters (e.g. ộ -> o + combining marks), then remove combining marks
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
+        // Remove all non-ASCII characters (combining diacritical marks fall in range \u0300-\u036F)
+        return normalized.replaceAll("[^\\x00-\\x7F]", "").trim();
+    }
+
     @Override
     @Transactional
     public PaymentResponse createPaymentLink(User user, Long planId) {
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new IllegalArgumentException("Plan not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.PLAN_NOT_FOUND));
 
         // Generate a unique order code (PayOS requires an integer/long <= 9007199254740991)
         Long orderCode = System.currentTimeMillis() % 10000000000L;
@@ -63,12 +78,21 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             String returnUrl = frontendUrl + "/payment/success";
             String cancelUrl = frontendUrl + "/payment/cancel";
-            String description = "Thanh toan goi " + plan.getName();
+
+            // PayOS chỉ chấp nhận ASCII thuần túy, tối đa 25 ký tự
+            String rawDescription = "Thanh toan goi " + plan.getName();
+            String safeDescription = toAsciiSafe(rawDescription);
+            String description = safeDescription.length() > 25
+                    ? safeDescription.substring(0, 25)
+                    : safeDescription;
+
+            log.info("Creating PayOS payment: orderCode={}, amount={}, description='{}'",
+                    orderCode, plan.getPrice(), description);
 
             CreatePaymentLinkRequest paymentData = CreatePaymentLinkRequest.builder()
                     .orderCode(orderCode)
                     .amount(plan.getPrice().longValue())
-                    .description(description.length() > 25 ? description.substring(0, 25) : description)
+                    .description(description)
                     .returnUrl(returnUrl)
                     .cancelUrl(cancelUrl)
                     .build();
@@ -84,9 +108,12 @@ public class PaymentServiceImpl implements PaymentService {
                     .qrCode(checkoutResponse.getQrCode())
                     .build();
 
+        } catch (AppException e) {
+            throw e; // Re-throw typed exceptions as-is
         } catch (Exception e) {
-            log.error("Error creating payment link with PayOS", e);
-            throw new RuntimeException("Could not create payment link");
+            log.error("Error creating payment link with PayOS: orderCode={}, planId={}, error={}",
+                    orderCode, planId, e.getMessage(), e);
+            throw new AppException(ErrorCode.PAYMENT_LINK_CREATION_FAILED);
         }
     }
 
@@ -140,7 +167,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public PaymentStatusResponse getPaymentStatus(Long orderCode) {
         PaymentTransaction transaction = paymentTransactionRepository.findByOrderCode(orderCode)
-                .orElseThrow(() -> new IllegalArgumentException("Transaction not found for orderCode: " + orderCode));
+                .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
 
         return PaymentStatusResponse.builder()
                 .orderCode(transaction.getOrderCode())
