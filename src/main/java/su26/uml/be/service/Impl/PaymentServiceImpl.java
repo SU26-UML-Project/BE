@@ -61,8 +61,10 @@ public class PaymentServiceImpl implements PaymentService {
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new AppException(ErrorCode.PLAN_NOT_FOUND));
 
-        // Generate a unique order code (PayOS requires an integer/long <= 9007199254740991)
-        Long orderCode = System.currentTimeMillis() % 10000000000L;
+        // Generate a unique order code for the transaction
+        // Use current timestamp + 2 random digits to ensure uniqueness and fit in 15 digits
+        String randomSuffix = String.format("%02d", new java.util.Random().nextInt(100));
+        Long orderCode = Long.parseLong(System.currentTimeMillis() + randomSuffix);
 
         PaymentTransaction transaction = PaymentTransaction.builder()
                 .orderCode(orderCode)
@@ -124,6 +126,12 @@ public class PaymentServiceImpl implements PaymentService {
             Long orderCode = webhookData.getOrderCode();
             log.info("Processing webhook for orderCode: {}", orderCode);
 
+            // Check if webhook represents a successful payment
+            if (!"00".equals(webhookData.getCode())) {
+                log.info("Webhook event is not a successful payment. Code: {}", webhookData.getCode());
+                return;
+            }
+
             Optional<PaymentTransaction> transactionOpt = paymentTransactionRepository
                     .findByOrderCodeAndStatus(orderCode, PaymentStatus.PENDING);
 
@@ -141,7 +149,15 @@ public class PaymentServiceImpl implements PaymentService {
             Plan plan = transaction.getPlan();
 
             LocalDateTime now = LocalDateTime.now();
-            LocalDateTime endDate = now.plusDays(plan.getDurationDays() != null ? plan.getDurationDays() : 30);
+            LocalDateTime startDate = now;
+            
+            // If user has an active subscription, start the new one from the end date of the current one
+            Subscription currentSub = user.getCurrentSubscription();
+            if (currentSub != null && currentSub.getEndDate() != null && currentSub.getEndDate().isAfter(now)) {
+                startDate = currentSub.getEndDate();
+            }
+            
+            LocalDateTime endDate = startDate.plusDays(plan.getDurationDays() != null ? plan.getDurationDays() : 30);
 
             Subscription subscription = Subscription.builder()
                     .user(user)
