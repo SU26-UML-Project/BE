@@ -80,6 +80,9 @@ public enum ErrorCode {
     AI_PROVIDER_MODELS_FAILED(1088, "Không thể lấy danh sách model từ provider", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_DOCUMENT_CONTENT_NOT_FOUND(1091, "Không tìm thấy nội dung document", HttpStatus.NOT_FOUND),
 
+    // AUDIT LOG
+    INVALID_DATE_RANGE(1092, "Khoảng thời gian không hợp lệ: 'from' phải trước hoặc bằng 'to'", HttpStatus.BAD_REQUEST),
+
     PASSWORD_INCORRECT(1070, "Mật khẩu hiện tại không chính xác", HttpStatus.BAD_REQUEST),
     PASSWORD_CHANGE_LIMIT(1071, "Bạn chỉ được phép đổi mật khẩu 1 lần trong vòng 7 ngày", HttpStatus.BAD_REQUEST),
     OTP_ATTEMPTS_EXCEEDED(1072, "Bạn đã nhập sai mã OTP quá số lần cho phép. Vui lòng yêu cầu mã mới.", HttpStatus.BAD_REQUEST),

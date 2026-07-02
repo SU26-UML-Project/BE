@@ -308,4 +308,77 @@ public final class SwaggerExamples {
               "code": 200,
               "message": "Xóa các dự án thành công"
             }""";
+
+    // ─── Audit Log ──────────────────────────────────────
+    /**
+     * Danh mục action được ghi log — dùng trong mô tả Swagger. Dropdown lọc nên lấy ĐỘNG từ
+     * GET /admin/audit-logs/actions (không hardcode). Action "reserved" sẽ TỰ ĐỘNG vào log khi
+     * endpoint tương ứng ra đời (chỉ cần thêm @Auditable) — không phải đổi bảng/API audit.
+     */
+    public static final String AUDIT_ACTIONS_CATALOG = """
+            Các action ĐANG được ghi log tự động:
+            • USER_LOCK, USER_UNLOCK — target USER (detail: {before, after})
+            • ADMIN_CREATE — target USER (detail: {email, role})
+            • AI_CONFIG_UPDATE — target AI_CONFIG
+            • AI_WORKSPACE_CREATE / AI_WORKSPACE_UPDATE / AI_WORKSPACE_DELETE — target AI_WORKSPACE
+            • AI_DOCUMENT_UPLOAD / AI_DOCUMENT_DELETE / AI_DOCUMENT_REEMBED — target AI_DOCUMENT
+            • ACCOUNT_AUTO_DELETE — target USER; actor HỆ THỐNG (actorName='UMLAdminSystem', actorId=null)
+
+            Reserved — CHƯA kích hoạt (còn mock ở FE, chưa có endpoint). Khi có endpoint thật, chỉ cần
+            thêm @Auditable là action tự xuất hiện trong DB + dropdown; không đổi bảng/API audit:
+            • SUBSCRIPTION_CREATE / SUBSCRIPTION_UPDATE / SUBSCRIPTION_DELETE — target SUBSCRIPTION
+            • TEMPLATE_CREATE / TEMPLATE_UPDATE / TEMPLATE_DELETE — target TEMPLATE""";
+
+    public static final String AUDIT_LOGS_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Lấy nhật ký thao tác thành công",
+              "result": {
+                "content": [
+                  {
+                    "id": 1024,
+                    "actorId": "3f1e9c2a-8b7d-4a11-9f0e-2c6d5b4a3e21",
+                    "actorName": "Nguyễn Minh Anh",
+                    "actorEmail": "admin@uml.studio",
+                    "action": "USER_LOCK",
+                    "targetType": "USER",
+                    "targetId": "42",
+                    "detail": { "before": "ACTIVE", "after": "LOCKED" },
+                    "createdAt": "2026-07-01T14:32:10Z"
+                  },
+                  {
+                    "id": 1023,
+                    "actorName": "UMLAdminSystem",
+                    "action": "ACCOUNT_AUTO_DELETE",
+                    "targetType": "USER",
+                    "targetId": "9f1c2a3b-5717-4562-b3fc-2c963f66afa6",
+                    "detail": { "email": "olduser@gmail.com", "deletionDate": "2026-06-01T00:00:00" },
+                    "createdAt": "2026-07-01T00:00:00Z"
+                  }
+                ],
+                "page": 0,
+                "size": 20,
+                "totalElements": 1024,
+                "totalPages": 52
+              }
+            }""";
+
+    public static final String AUDIT_ACTIONS_RESPONSE = """
+            {
+              "code": 200,
+              "message": "Lấy danh sách action thành công",
+              "result": [
+                "ACCOUNT_AUTO_DELETE",
+                "ADMIN_CREATE",
+                "AI_CONFIG_UPDATE",
+                "AI_DOCUMENT_DELETE",
+                "AI_DOCUMENT_REEMBED",
+                "AI_DOCUMENT_UPLOAD",
+                "AI_WORKSPACE_CREATE",
+                "AI_WORKSPACE_DELETE",
+                "AI_WORKSPACE_UPDATE",
+                "USER_LOCK",
+                "USER_UNLOCK"
+              ]
+            }""";
 }
